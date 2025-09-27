@@ -3,7 +3,14 @@
     "allow": [
       "Bash(open:*)",
       "Bash(git init:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(gh repo create:*)",
+      "Bash(echo:*)",
+      "Bash(git remote add:*)",
+      "Bash(git branch:*)",
+      "Bash(git push:*)",
+      "Read(//var/folders/s3/sn5f6ttx2q1c4vx5q2c6lp980000gn/T/TemporaryItems/NSIRD_screencaptureui_CN6zDh/**)"
     ],
     "deny": [],
     "ask": []

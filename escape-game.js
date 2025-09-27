@@ -66,9 +66,16 @@ class Cat {
         this.targetY = null;
         this.vx = 0;
         this.vy = 0;
-        this.speed = 3;
-        this.runSpeed = 5;
-        this.currentSpeed = this.speed;
+
+        // 速度曲线参数
+        this.minSpeed = 0.5;      // 起步速度
+        this.normalSpeed = 3;      // 正常最高速度
+        this.runSpeed = 5;         // 奔跑最高速度
+        this.currentMaxSpeed = this.normalSpeed;  // 当前最高速度（正常或奔跑）
+        this.actualSpeed = 0;      // 实际当前速度
+        this.acceleration = 0.1;   // 加速度
+        this.deceleration = 0.15;  // 减速度（比加速快）
+
         this.health = 100;
         this.maxHealth = 100;
         this.size = 30;
@@ -79,11 +86,17 @@ class Cat {
         this.maxStamina = 100;
         this.invulnerable = false;
         this.invulnerableTime = 0;
+        this.isMoving = false;     // 是否正在移动
 
         // 精灵图参数
         this.currentSprite = 4; // 当前使用的精灵索引（默认中间那个）
         this.animationSpeed = 0.15;
         this.animationTimer = 0;
+
+        // 坐下相关
+        this.idleTime = 0;        // 静止时间计数
+        this.sitThreshold = 180;  // 3秒（60帧/秒）后坐下
+        this.isSitting = false;   // 是否正在坐着
     }
 
     update(keys) {
@@ -95,10 +108,13 @@ class Cat {
         if (keys.ArrowUp || keys.KeyW) dy = -1;
         if (keys.ArrowDown || keys.KeyS) dy = 1;
 
-        // 奔跑
+        // 奔跑状态
         this.isRunning = keys.ShiftLeft && this.stamina > 0;
-        this.currentSpeed = this.isRunning ? this.runSpeed : this.speed;
 
+        // 设置目标最高速度（正常或奔跑）
+        this.currentMaxSpeed = this.isRunning ? this.runSpeed : this.normalSpeed;
+
+        // 体力消耗和恢复
         if (this.isRunning && (dx !== 0 || dy !== 0)) {
             this.stamina = Math.max(0, this.stamina - 0.5);
         } else if (!this.isRunning) {
@@ -127,11 +143,34 @@ class Cat {
             }
         }
 
-        // 归一化并应用速度
-        if (dx !== 0 || dy !== 0) {
+        // 判断是否要移动
+        this.isMoving = (dx !== 0 || dy !== 0);
+
+        // 速度曲线处理
+        if (this.isMoving) {
+            // 加速
+            if (this.actualSpeed < this.currentMaxSpeed) {
+                this.actualSpeed += this.acceleration;
+                // 从静止开始时，至少有最小速度
+                if (this.actualSpeed < this.minSpeed) {
+                    this.actualSpeed = this.minSpeed;
+                }
+                // 不超过最高速度
+                if (this.actualSpeed > this.currentMaxSpeed) {
+                    this.actualSpeed = this.currentMaxSpeed;
+                }
+            } else if (this.actualSpeed > this.currentMaxSpeed) {
+                // 从奔跑切换到正常速度时的减速
+                this.actualSpeed -= this.deceleration;
+                if (this.actualSpeed < this.currentMaxSpeed) {
+                    this.actualSpeed = this.currentMaxSpeed;
+                }
+            }
+
+            // 归一化方向并应用实际速度
             const mag = Math.sqrt(dx * dx + dy * dy);
-            this.vx = (dx / mag) * this.currentSpeed;
-            this.vy = (dy / mag) * this.currentSpeed;
+            this.vx = (dx / mag) * this.actualSpeed;
+            this.vy = (dy / mag) * this.actualSpeed;
 
             // 键盘控制时更新面向
             if (!this.targetX && !this.targetY) {
@@ -139,12 +178,19 @@ class Cat {
                 else if (dx < 0) this.facing = 'left';
             }
         } else {
-            this.vx *= 0.9;
-            this.vy *= 0.9;
+            // 减速
+            this.actualSpeed -= this.deceleration;
+            if (this.actualSpeed < 0) {
+                this.actualSpeed = 0;
+            }
+
+            // 惯性减速
+            this.vx *= 0.85;
+            this.vy *= 0.85;
 
             // 当速度足够小时，完全停止
-            if (Math.abs(this.vx) < 0.1) this.vx = 0;
-            if (Math.abs(this.vy) < 0.1) this.vy = 0;
+            if (Math.abs(this.vx) < 0.05) this.vx = 0;
+            if (Math.abs(this.vy) < 0.05) this.vy = 0;
         }
 
         // 更新位置
@@ -158,10 +204,10 @@ class Cat {
         // 更新精灵动画
         const isMoving = Math.abs(this.vx) > 0.1 || Math.abs(this.vy) > 0.1;
 
-        // 调试：每60帧输出一次状态
-        if (Math.floor(this.animationFrame) % 60 === 0) {
-            console.log('Speed:', this.vx.toFixed(3), this.vy.toFixed(3), 'Moving:', isMoving);
-        }
+        // 调试：每60帧输出一次状态（已注释，需要时可打开）
+        // if (Math.floor(this.animationFrame) % 60 === 0) {
+        //     console.log('ActualSpeed:', this.actualSpeed.toFixed(2), 'Target:', this.currentMaxSpeed, 'Moving:', isMoving);
+        // }
 
         if (isMoving) {
             // 只在移动时更新动画帧
@@ -181,10 +227,37 @@ class Cat {
                 }
             }
         } else {
-            // 静止时固定使用第一排中间的精灵，不更新动画
-            this.currentSprite = 4;
+            // 静止时的处理
             this.animationTimer = 0;
             this.animationFrame = 0;  // 重置动画帧
+
+            // 增加静止时间
+            this.idleTime++;
+
+            // 检查是否应该坐下
+            if (this.idleTime > this.sitThreshold && !this.isSitting) {
+                this.isSitting = true;
+                // 坐着的姿势在第一排中间 (索引1)
+                this.currentSprite = 1;
+            } else if (!this.isSitting) {
+                // 站立姿势
+                this.currentSprite = 4;
+            }
+
+            // 坐着时偶尔切换不同的坐姿（让猫咪看起来更生动）
+            if (this.isSitting && Math.random() < 0.005) {
+                // 只在真正的坐姿间切换
+                const sitPoses = [0, 1];  // 只使用第一排左边和中间的坐姿
+                this.currentSprite = sitPoses[Math.floor(Math.random() * sitPoses.length)];
+            }
+        }
+
+        // 如果开始移动，重置坐下状态
+        if (isMoving && this.isSitting) {
+            this.isSitting = false;
+            this.idleTime = 0;
+        } else if (isMoving) {
+            this.idleTime = 0;
         }
 
         // 更新无敌时间
@@ -880,7 +953,8 @@ class GameWorld {
 
     updateUI() {
         // 更新血量
-        document.getElementById('healthFill').style.width = `${this.cat.health}%`;
+        const healthPercent = Math.max(0, this.cat.health);
+        document.getElementById('healthFill').style.width = `${healthPercent}%`;
 
         // 更新距离
         const dx = this.exit.x - this.cat.x;
@@ -888,8 +962,12 @@ class GameWorld {
         const distance = Math.floor(Math.sqrt(dx * dx + dy * dy));
         document.getElementById('distance').textContent = `距离出口: ${distance}m`;
 
-        // 更新安全状态
+        // 危险警告
+        const warningElement = document.getElementById('warning');
+        let dogNearby = false;
         let inSafeZone = false;
+
+        // 检查是否在安全区
         for (let light of this.lights) {
             if (light.isInSafeZone(this.cat.x, this.cat.y)) {
                 inSafeZone = true;
@@ -897,18 +975,7 @@ class GameWorld {
             }
         }
 
-        const statusElement = document.getElementById('safeStatus');
-        if (inSafeZone) {
-            statusElement.textContent = '状态: 安全';
-            statusElement.style.color = '#4CAF50';
-        } else {
-            statusElement.textContent = '状态: 危险';
-            statusElement.style.color = '#f44336';
-        }
-
-        // 危险警告
-        const warningElement = document.getElementById('warning');
-        let dogNearby = false;
+        // 检查野狗是否接近
         for (let dog of this.dogs) {
             const dx = dog.x - this.cat.x;
             const dy = dog.y - this.cat.y;
