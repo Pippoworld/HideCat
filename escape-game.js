@@ -57,6 +57,15 @@ catSprite.onload = () => {
     console.log('Each sprite:', spriteWidth, 'x', spriteHeight);
 };
 
+// 加载路灯图片
+const lampSprite = new Image();
+lampSprite.src = 'lamp.png';
+let lampLoaded = false;
+lampSprite.onload = () => {
+    lampLoaded = true;
+    console.log('Lamp sprite loaded');
+};
+
 // 猫咪角色
 class Cat {
     constructor(x, y) {
@@ -99,7 +108,7 @@ class Cat {
         this.isSitting = false;   // 是否正在坐着
     }
 
-    update(keys) {
+    update(keys, lights = []) {
         // 键盘控制
         let dx = 0, dy = 0;
 
@@ -193,9 +202,41 @@ class Cat {
             if (Math.abs(this.vy) < 0.05) this.vy = 0;
         }
 
-        // 更新位置
-        this.x += this.vx;
-        this.y += this.vy;
+        // 检查路灯碰撞
+        let newX = this.x + this.vx;
+        let newY = this.y + this.vy;
+        let canMoveX = true;
+        let canMoveY = true;
+
+        // 检查每个路灯的碰撞
+        for (let light of lights) {
+            // 路灯碰撞参数
+            const collisionRadius = 15;  // 碰撞半径（稍微小一点）
+            const collisionOffsetY = -40;  // 碰撞中心向上偏移（灯杆中部）
+
+            // 碰撞中心点（在灯杆中部）
+            const collisionX = light.x;
+            const collisionY = light.y + collisionOffsetY;
+
+            // 分别检查X和Y方向的移动
+            // 检查X方向
+            const dxNew = newX - collisionX;
+            const dyOld = this.y - collisionY;
+            if (Math.sqrt(dxNew * dxNew + dyOld * dyOld) < collisionRadius + this.size/2) {
+                canMoveX = false;
+            }
+
+            // 检查Y方向
+            const dxOld = this.x - collisionX;
+            const dyNew = newY - collisionY;
+            if (Math.sqrt(dxOld * dxOld + dyNew * dyNew) < collisionRadius + this.size/2) {
+                canMoveY = false;
+            }
+        }
+
+        // 更新位置（只在可以移动的方向上更新）
+        if (canMoveX) this.x = newX;
+        if (canMoveY) this.y = newY;
 
         // 限制在世界边界内
         this.x = Math.max(this.size, Math.min(WORLD_WIDTH - this.size, this.x));
@@ -386,7 +427,7 @@ class Cat {
 
 // 灯光安全区
 class SafeLight {
-    constructor(x, y, radius = 150) {
+    constructor(x, y, radius = 170) {
         this.x = x;
         this.y = y;
         this.radius = radius;
@@ -406,21 +447,114 @@ class SafeLight {
         return Math.sqrt(dx * dx + dy * dy) < this.radius;
     }
 
-    draw(ctx, camera) {
+    // 绘制底层部分（光效和底座）
+    drawBase(ctx, camera) {
         const screenX = this.x - camera.x;
         const screenY = this.y - camera.y;
 
-        // 灯光效果
-        const gradient = ctx.createRadialGradient(screenX, screenY, this.innerRadius, screenX, screenY, this.radius);
-        gradient.addColorStop(0, `rgba(255, 240, 150, ${0.4 * this.brightness})`);
-        gradient.addColorStop(0.5, `rgba(255, 240, 150, ${0.2 * this.brightness})`);
-        gradient.addColorStop(1, 'rgba(255, 240, 150, 0)');
+        // 增强的地面照明效果 - 用更亮的叠加层来增加"清晰度"
+        ctx.save();
+        ctx.globalCompositeOperation = 'screen';  // 使用滤色混合模式，让光照区域更亮更清晰
+
+        // 主光圈 - 更强的亮度
+        const gradient = ctx.createRadialGradient(screenX, screenY + 20, 0, screenX, screenY + 20, this.radius);
+        gradient.addColorStop(0, `rgba(255, 245, 180, ${0.6 * this.brightness})`);
+        gradient.addColorStop(0.3, `rgba(255, 240, 150, ${0.4 * this.brightness})`);
+        gradient.addColorStop(0.6, `rgba(255, 235, 120, ${0.2 * this.brightness})`);
+        gradient.addColorStop(1, 'rgba(255, 230, 100, 0)');
 
         ctx.fillStyle = gradient;
         ctx.beginPath();
-        ctx.arc(screenX, screenY, this.radius, 0, Math.PI * 2);
+        ctx.arc(screenX, screenY + 20, this.radius, 0, Math.PI * 2);
         ctx.fill();
 
+        // 内部高光 - 最亮的中心区域
+        const innerGradient = ctx.createRadialGradient(screenX, screenY + 20, 0, screenX, screenY + 20, this.radius * 0.5);
+        innerGradient.addColorStop(0, `rgba(255, 255, 220, ${0.3 * this.brightness})`);
+        innerGradient.addColorStop(1, 'rgba(255, 255, 200, 0)');
+
+        ctx.fillStyle = innerGradient;
+        ctx.beginPath();
+        ctx.arc(screenX, screenY + 20, this.radius * 0.5, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.restore();
+
+        // 绘制路灯底座部分（如果图片已加载）
+        if (lampLoaded) {
+            const lampHeight = 180;
+            const lampWidth = lampHeight * (lampSprite.width / lampSprite.height);
+            const lampTopY = screenY - lampHeight + 20;
+
+            // 只绘制底座部分（图片底部约33%的部分 - 包含完整石头底座）
+            ctx.save();
+            ctx.drawImage(
+                lampSprite,
+                0, lampSprite.height * 0.67,  // 源图片：从67%高度开始（包含完整石头底座）
+                lampSprite.width, lampSprite.height * 0.33,  // 源图片：取33%高度
+                screenX - lampWidth / 2,
+                lampTopY + lampHeight * 0.67,  // 目标位置：对应底部33%
+                lampWidth,
+                lampHeight * 0.33  // 目标大小：33%高度
+            );
+            ctx.restore();
+        }
+    }
+
+    // 绘制顶层部分（灯杆和灯头）
+    drawPole(ctx, camera) {
+        const screenX = this.x - camera.x;
+        const screenY = this.y - camera.y;
+
+        // 如果路灯图片已加载，使用图片绘制
+        if (lampLoaded) {
+            // 绘制路灯图片
+            const lampHeight = 180;  // 增大路灯尺寸
+            const lampWidth = lampHeight * (lampSprite.width / lampSprite.height);
+            const lampTopY = screenY - lampHeight + 20;
+
+            // 先绘制灯泡位置的点光源光晕
+            ctx.save();
+            const bulbY = lampTopY + lampHeight * 0.17;  // 灯泡大约在顶部17%的位置
+
+            // 绘制灯泡光晕 - 更小更柔和
+            const bulbGradient = ctx.createRadialGradient(screenX, bulbY, 0, screenX, bulbY, 25);
+            bulbGradient.addColorStop(0, `rgba(255, 255, 200, ${0.5 * this.brightness})`);
+            bulbGradient.addColorStop(0.3, `rgba(255, 245, 150, ${0.3 * this.brightness})`);
+            bulbGradient.addColorStop(0.6, `rgba(255, 240, 120, ${0.2 * this.brightness})`);
+            bulbGradient.addColorStop(1, 'rgba(255, 235, 100, 0)');
+
+            ctx.fillStyle = bulbGradient;
+            ctx.beginPath();
+            ctx.arc(screenX, bulbY, 25, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+
+            // 只绘制灯杆和灯头部分（图片顶部约75%的部分 - 不包括石头底座）
+            ctx.save();
+            // 灯泡发光效果 - 在灯的顶部添加光晕
+            ctx.shadowColor = `rgba(255, 250, 180, ${this.brightness})`;
+            ctx.shadowBlur = 50;
+            ctx.shadowOffsetY = -10;
+
+            ctx.drawImage(
+                lampSprite,
+                0, 0,  // 源图片：从顶部开始
+                lampSprite.width, lampSprite.height * 0.67,  // 源图片：取67%高度（不包括石头底座）
+                screenX - lampWidth / 2,
+                lampTopY,  // 目标位置：正常位置
+                lampWidth,
+                lampHeight * 0.67  // 目标大小：67%高度
+            );
+            ctx.restore();
+        } else {
+            // 备用绘制（图片未加载时）
+            this.drawBackupLamp(ctx, screenX, screenY);
+        }
+    }
+
+    // 备用灯具绘制
+    drawBackupLamp(ctx, screenX, screenY) {
         // 灯杆
         ctx.strokeStyle = '#444';
         ctx.lineWidth = 8;
@@ -784,7 +918,7 @@ class GameWorld {
         if (!gameState.running) return;
 
         // 更新猫（传递目标给猫咪自己处理）
-        this.cat.update(this.keys);
+        this.cat.update(this.keys, this.lights);
 
         // 相机跟随
         this.camera.follow(this.cat);
@@ -824,17 +958,53 @@ class GameWorld {
         // 绘制障碍物
         this.drawObstacles();
 
-        // 绘制灯光（底层）
-        this.lights.forEach(light => light.draw(ctx, this.camera));
+        // 绘制灯光底层（光效）
+        this.lights.forEach(light => light.drawBase(ctx, this.camera));
 
-        // 绘制野狗
-        this.dogs.forEach(dog => dog.draw(ctx, this.camera));
+        // 收集所有需要按Y轴排序的对象
+        const renderables = [];
 
-        // 绘制猫
-        this.cat.draw(ctx, this.camera);
+        // 添加路灯的灯杆部分
+        this.lights.forEach(light => {
+            renderables.push({
+                y: light.y,  // 使用路灯的Y坐标进行排序
+                type: 'lamp',
+                obj: light,
+                draw: () => light.drawPole(ctx, this.camera)
+            });
+        });
 
-        // 绘制出口
-        this.exit.draw(ctx, this.camera);
+        // 添加野狗
+        this.dogs.forEach(dog => {
+            renderables.push({
+                y: dog.y,
+                type: 'dog',
+                obj: dog,
+                draw: () => dog.draw(ctx, this.camera)
+            });
+        });
+
+        // 添加猫
+        renderables.push({
+            y: this.cat.y,
+            type: 'cat',
+            obj: this.cat,
+            draw: () => this.cat.draw(ctx, this.camera)
+        });
+
+        // 添加出口
+        renderables.push({
+            y: this.exit.y,
+            type: 'exit',
+            obj: this.exit,
+            draw: () => this.exit.draw(ctx, this.camera)
+        });
+
+        // 按Y坐标排序（Y越小越先绘制，在画面后方）
+        renderables.sort((a, b) => a.y - b.y);
+
+        // 按顺序绘制
+        renderables.forEach(item => item.draw());
 
         // 绘制小地图
         this.drawMinimap();
@@ -853,7 +1023,7 @@ class GameWorld {
                 const screenX = x - this.camera.x;
                 const screenY = y - this.camera.y;
 
-                // 棋盘格图案
+                // 棋盘格图案 - 保持原来的暗色
                 const isDark = ((x / tileSize) + (y / tileSize)) % 2 === 0;
                 ctx.fillStyle = isDark ? '#0f0f0f' : '#1a1a1a';
                 ctx.fillRect(screenX, screenY, tileSize, tileSize);
