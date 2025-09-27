@@ -209,6 +209,7 @@ class Cat {
         let canMoveY = true;
 
         // 检查每个路灯的碰撞
+        let hitLamp = false;
         for (let light of lights) {
             // 路灯碰撞参数
             const collisionRadius = 15;  // 碰撞半径（稍微小一点）
@@ -224,6 +225,7 @@ class Cat {
             const dyOld = this.y - collisionY;
             if (Math.sqrt(dxNew * dxNew + dyOld * dyOld) < collisionRadius + this.size/2) {
                 canMoveX = false;
+                hitLamp = true;
             }
 
             // 检查Y方向
@@ -231,7 +233,17 @@ class Cat {
             const dyNew = newY - collisionY;
             if (Math.sqrt(dxOld * dxOld + dyNew * dyNew) < collisionRadius + this.size/2) {
                 canMoveY = false;
+                hitLamp = true;
             }
+        }
+
+        // 如果碰到路灯，清除鼠标目标点，停止移动
+        if (hitLamp && this.targetX !== null && this.targetY !== null) {
+            this.targetX = null;
+            this.targetY = null;
+            this.vx = 0;
+            this.vy = 0;
+            this.actualSpeed = 0;
         }
 
         // 更新位置（只在可以移动的方向上更新）
