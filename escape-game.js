@@ -66,6 +66,22 @@ lampSprite.onload = () => {
     console.log('Lamp sprite loaded');
 };
 
+// 加载狗精灵图
+const dogSprite = new Image();
+dogSprite.src = 'dogwalk.png';
+let dogSpriteLoaded = false;
+let dogSpriteWidth = 0;
+let dogSpriteHeight = 0;
+
+dogSprite.onload = () => {
+    dogSpriteLoaded = true;
+    // 狗精灵图是4x8的网格
+    dogSpriteWidth = Math.floor(dogSprite.width / 4);
+    dogSpriteHeight = Math.floor(dogSprite.height / 8);
+    console.log('Dog sprite loaded:', dogSprite.width, 'x', dogSprite.height);
+    console.log('Each dog sprite:', dogSpriteWidth, 'x', dogSpriteHeight);
+};
+
 // 猫咪角色
 class Cat {
     constructor(x, y) {
@@ -589,6 +605,185 @@ class SafeLight {
     }
 }
 
+// 可控制的狗
+class PlayerDog {
+    constructor(x, y) {
+        this.x = x;
+        this.y = y;
+        this.targetX = null;
+        this.targetY = null;
+        this.vx = 0;
+        this.vy = 0;
+
+        // 速度参数（比猫更快）
+        this.minSpeed = 1;
+        this.normalSpeed = 4;
+        this.runSpeed = 7;
+        this.currentMaxSpeed = this.normalSpeed;
+        this.actualSpeed = 0;
+        this.acceleration = 0.15;
+        this.deceleration = 0.2;
+
+        this.health = 150; // 狗血更厚
+        this.maxHealth = 150;
+        this.size = 40;
+        this.animationFrame = 0;
+        this.facing = 'right';
+        this.isRunning = false;
+        this.isMoving = false;
+        this.currentSprite = 0;
+    }
+
+    update(keys) {
+        // 键盘控制（和猫一样）
+        let dx = 0, dy = 0;
+
+        if (keys.ArrowLeft || keys.KeyA) dx = -1;
+        if (keys.ArrowRight || keys.KeyD) dx = 1;
+        if (keys.ArrowUp || keys.KeyW) dy = -1;
+        if (keys.ArrowDown || keys.KeyS) dy = 1;
+
+        // Shift 奔跑
+        this.isRunning = keys.ShiftLeft || keys.ShiftRight;
+        this.currentMaxSpeed = this.isRunning ? this.runSpeed : this.normalSpeed;
+
+        // 鼠标目标控制
+        if (this.targetX !== null && this.targetY !== null) {
+            const distX = this.targetX - this.x;
+            const distY = this.targetY - this.y;
+            const distance = Math.sqrt(distX * distX + distY * distY);
+
+            if (distance > 10) {
+                dx = distX / distance;
+                dy = distY / distance;
+            } else {
+                this.targetX = null;
+                this.targetY = null;
+            }
+        }
+
+        // 速度控制
+        if (dx !== 0 || dy !== 0) {
+            if (this.actualSpeed < this.currentMaxSpeed) {
+                this.actualSpeed = Math.min(this.actualSpeed + this.acceleration, this.currentMaxSpeed);
+            } else if (this.actualSpeed > this.currentMaxSpeed) {
+                this.actualSpeed = Math.max(this.actualSpeed - this.deceleration, this.currentMaxSpeed);
+            }
+
+            const length = Math.sqrt(dx * dx + dy * dy);
+            this.vx = (dx / length) * this.actualSpeed;
+            this.vy = (dy / length) * this.actualSpeed;
+            this.isMoving = true;
+        } else {
+            if (this.actualSpeed > 0) {
+                this.actualSpeed = Math.max(this.actualSpeed - this.deceleration, 0);
+            }
+
+            if (this.actualSpeed > 0) {
+                const speed = Math.sqrt(this.vx * this.vx + this.vy * this.vy);
+                if (speed > 0) {
+                    this.vx = (this.vx / speed) * this.actualSpeed;
+                    this.vy = (this.vy / speed) * this.actualSpeed;
+                }
+            } else {
+                this.vx = 0;
+                this.vy = 0;
+                this.isMoving = false;
+            }
+        }
+
+        // 更新位置
+        this.x += this.vx;
+        this.y += this.vy;
+
+        // 边界限制
+        this.x = Math.max(50, Math.min(WORLD_WIDTH - 50, this.x));
+        this.y = Math.max(50, Math.min(WORLD_HEIGHT - 50, this.y));
+    }
+
+    setMouseTarget(worldX, worldY) {
+        this.targetX = worldX;
+        this.targetY = worldY;
+    }
+
+    takeDamage(amount) {
+        this.health -= amount;
+        if (this.health <= 0) {
+            this.health = 0;
+            return true;
+        }
+        return false;
+    }
+
+    draw(ctx, camera) {
+        const screenX = this.x - camera.x;
+        const screenY = this.y - camera.y;
+
+        ctx.save();
+        ctx.translate(screenX, screenY);
+
+        // 影子
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+        ctx.beginPath();
+        ctx.ellipse(0, 25, 35, 15, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // 如果狗精灵图已加载，使用精灵图绘制
+        if (dogSpriteLoaded) {
+            // 更新面向方向
+            if (this.vx > 0.1) {
+                this.facing = 'right';
+            } else if (this.vx < -0.1) {
+                this.facing = 'left';
+            }
+
+            // 更新动画帧（和野狗使用相同的关键帧）
+            const isMoving = Math.abs(this.vx) > 0.1 || Math.abs(this.vy) > 0.1;
+            if (isMoving) {
+                this.animationFrame += 0.1;
+                // 使用相同的关键帧序列
+                const keyFrames = [0, 5, 10, 14, 11, 15, 10, 6];
+                const frameIndex = Math.floor(this.animationFrame) % keyFrames.length;
+                this.currentSprite = keyFrames[frameIndex];
+            } else {
+                this.currentSprite = 0;
+                this.animationFrame = 0;
+            }
+
+            // 计算精灵图中的位置
+            const sx = (this.currentSprite % 4) * dogSpriteWidth;
+            const sy = Math.floor(this.currentSprite / 4) * dogSpriteHeight;
+
+            // 根据面向方向翻转
+            if (this.facing === 'right') {
+                ctx.scale(-1, 1);
+            }
+
+            // 设置图像渲染质量
+            ctx.imageSmoothingEnabled = false;
+
+            // 保持原始宽高比的缩放（玩家控制的狗稍大）
+            const scale = 0.6;
+            const drawWidth = dogSpriteWidth * scale;
+            const drawHeight = dogSpriteHeight * scale;
+
+            ctx.drawImage(
+                dogSprite,
+                sx, sy,
+                dogSpriteWidth, dogSpriteHeight,
+                -drawWidth / 2, -drawHeight / 2 - 10,
+                drawWidth, drawHeight
+            );
+        } else {
+            // 备用绘制
+            ctx.fillStyle = '#8B4513';
+            ctx.fillRect(-25, -25, 50, 40);
+        }
+
+        ctx.restore();
+    }
+}
+
 // 野狗
 class WildDog {
     constructor(x, y) {
@@ -611,6 +806,8 @@ class WildDog {
         this.animationFrame = 0;
         this.attackCooldown = 0;
         this.growlSound = false;
+        this.facing = 'left';  // 狗面向的方向
+        this.currentSprite = 0; // 当前精灵帧
     }
 
     update(cat, lights) {
@@ -634,15 +831,67 @@ class WildDog {
         // 状态机
         switch (this.state) {
             case 'patrol':
-                // 巡逻模式
-                this.patrolAngle += 0.02;
-                this.vx = Math.cos(this.patrolAngle) * this.speed * 0.5;
-                this.vy = Math.sin(this.patrolAngle) * this.speed * 0.5;
+                // 巡逻模式 - 从点到点移动
+
+                // 初始化或选择新的目标点
+                if (!this.targetPoint || this.needNewTarget) {
+                    // 在领地范围内随机选择一个目标点
+                    const angle = Math.random() * Math.PI * 2;
+
+                    // 随机选择近距离或远距离目标
+                    let distance;
+                    if (Math.random() < 0.6) {
+                        // 60%概率选择近距离（小范围活动）
+                        distance = Math.random() * this.territoryRadius * 0.3;
+                    } else {
+                        // 40%概率选择远距离（大范围巡逻）
+                        distance = this.territoryRadius * 0.3 + Math.random() * this.territoryRadius * 0.4;
+                    }
+
+                    this.targetPoint = {
+                        x: this.homeX + Math.cos(angle) * distance,
+                        y: this.homeY + Math.sin(angle) * distance
+                    };
+                    this.needNewTarget = false;
+                    this.restTimer = 0;
+                }
+
+                // 计算到目标点的距离
+                const targetDx = this.targetPoint.x - this.x;
+                const targetDy = this.targetPoint.y - this.y;
+                const targetDistance = Math.sqrt(targetDx * targetDx + targetDy * targetDy);
+
+                // 如果还没到达目标点
+                if (targetDistance > 20) {
+                    // 向目标点移动
+                    this.vx = (targetDx / targetDistance) * this.speed * 0.5;
+                    this.vy = (targetDy / targetDistance) * this.speed * 0.5;
+                    this.restTimer = 0;
+                } else {
+                    // 到达目标点，休息一会
+                    this.vx = 0;
+                    this.vy = 0;
+
+                    if (!this.restTimer) {
+                        this.restTimer = 0;
+                        this.restDuration = 120 + Math.random() * 180; // 休息2-5秒
+                    }
+
+                    this.restTimer++;
+
+                    // 休息结束后选择新目标
+                    if (this.restTimer > this.restDuration) {
+                        this.needNewTarget = true;
+                    }
+                }
 
                 // 保持在领地范围内
                 if (distanceToHome > this.territoryRadius * 0.8) {
-                    this.vx += (dhx / distanceToHome) * this.speed;
-                    this.vy += (dhy / distanceToHome) * this.speed;
+                    // 回家作为下一个目标点
+                    this.targetPoint = {
+                        x: this.homeX,
+                        y: this.homeY
+                    };
                 }
 
                 // 检测到猫且猫不在安全区
@@ -706,8 +955,7 @@ class WildDog {
         this.x = Math.max(this.size, Math.min(WORLD_WIDTH - this.size, this.x));
         this.y = Math.max(this.size, Math.min(WORLD_HEIGHT - this.size, this.y));
 
-        // 更新动画和冷却
-        this.animationFrame += 0.3;
+        // 更新冷却
         if (this.attackCooldown > 0) this.attackCooldown--;
     }
 
@@ -721,69 +969,80 @@ class WildDog {
         // 影子
         ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
         ctx.beginPath();
-        ctx.ellipse(0, 20, 25, 10, 0, 0, Math.PI * 2);
+        ctx.ellipse(0, 20, 30, 12, 0, 0, Math.PI * 2);
         ctx.fill();
 
-        // 身体
-        const bodyColor = this.state === 'chase' ? '#8B0000' : '#654321';
-        ctx.fillStyle = bodyColor;
-        ctx.beginPath();
-        ctx.ellipse(0, 0, 30, 20, 0, 0, Math.PI * 2);
-        ctx.fill();
+        // 如果狗精灵图已加载，使用精灵图绘制
+        if (dogSpriteLoaded) {
+            // 更新面向方向
+            if (this.vx > 0.1) {
+                this.facing = 'right';
+            } else if (this.vx < -0.1) {
+                this.facing = 'left';
+            }
 
-        // 头
-        ctx.beginPath();
-        ctx.ellipse(20, -5, 20, 18, 0, 0, Math.PI * 2);
-        ctx.fill();
+            // 更新动画帧
+            const isMoving = Math.abs(this.vx) > 0.1 || Math.abs(this.vy) > 0.1;
+            if (isMoving) {
+                this.animationFrame += 0.1;  // 调整动画速度
+                // 只使用动作幅度大的关键帧
+                const keyFrames = [0, 5, 10, 14, 11, 15, 10, 6]; // 选择动作明显的帧
+                const frameIndex = Math.floor(this.animationFrame) % keyFrames.length;
+                this.currentSprite = keyFrames[frameIndex];
+            } else {
+                // 静止时使用第一帧作为站立动画
+                this.currentSprite = 0;
+                this.animationFrame = 0;
+            }
 
-        // 耳朵
-        ctx.beginPath();
-        ctx.moveTo(15, -18);
-        ctx.lineTo(12, -28);
-        ctx.lineTo(20, -23);
-        ctx.closePath();
-        ctx.fill();
+            // 计算精灵图中的位置（4列x8行）
+            const sx = (this.currentSprite % 4) * dogSpriteWidth;
+            const sy = Math.floor(this.currentSprite / 4) * dogSpriteHeight;
 
-        ctx.beginPath();
-        ctx.moveTo(25, -18);
-        ctx.lineTo(22, -28);
-        ctx.lineTo(30, -23);
-        ctx.closePath();
-        ctx.fill();
+            // 根据面向方向翻转
+            if (this.facing === 'right') {
+                ctx.scale(-1, 1);  // 水平翻转
+            }
 
-        // 眼睛 (追击时发红光)
-        ctx.fillStyle = this.state === 'chase' ? '#ff0000' : '#000';
-        ctx.beginPath();
-        ctx.arc(18, -8, 3, 0, Math.PI * 2);
-        ctx.arc(26, -8, 3, 0, Math.PI * 2);
-        ctx.fill();
+            // 设置图像渲染质量
+            ctx.imageSmoothingEnabled = false; // 关闭抗锯齿，保持像素风格清晰
 
-        // 嘴巴和牙齿
-        if (this.state === 'chase') {
-            ctx.strokeStyle = '#000';
-            ctx.lineWidth = 2;
+            // 保持原始宽高比的缩放
+            const scale = 0.5; // 缩放倍数
+            const drawWidth = dogSpriteWidth * scale;
+            const drawHeight = dogSpriteHeight * scale;
+
+            ctx.drawImage(
+                dogSprite,
+                sx, sy,
+                dogSpriteWidth, dogSpriteHeight,
+                -drawWidth / 2, -drawHeight / 2 - 10,  // 稍微上移
+                drawWidth, drawHeight
+            );
+
+            // 如果在追击状态，添加红眼效果
+            if (this.state === 'chase') {
+                ctx.fillStyle = 'rgba(255, 0, 0, 0.5)';
+                ctx.beginPath();
+                // 根据面向调整眼睛位置
+                const eyeX = this.facing === 'right' ? -10 : 10;
+                ctx.arc(eyeX - 5, -15, 3, 0, Math.PI * 2);
+                ctx.arc(eyeX + 5, -15, 3, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        } else {
+            // 备用绘制（精灵图未加载时）
+            const bodyColor = this.state === 'chase' ? '#8B0000' : '#654321';
+            ctx.fillStyle = bodyColor;
             ctx.beginPath();
-            ctx.moveTo(25, 0);
-            ctx.lineTo(35, 2);
-            ctx.stroke();
+            ctx.ellipse(0, 0, 30, 20, 0, 0, Math.PI * 2);
+            ctx.fill();
 
-            // 牙齿
-            ctx.fillStyle = '#fff';
+            // 头
             ctx.beginPath();
-            ctx.moveTo(28, 0);
-            ctx.lineTo(30, 4);
-            ctx.lineTo(32, 0);
-            ctx.closePath();
+            ctx.ellipse(20, -5, 20, 18, 0, 0, Math.PI * 2);
             ctx.fill();
         }
-
-        // 腿部动画
-        const legOffset = Math.sin(this.animationFrame) * 5;
-        ctx.fillStyle = bodyColor;
-        ctx.beginPath();
-        ctx.ellipse(-10, 15 + legOffset, 8, 12, 0, 0, Math.PI * 2);
-        ctx.ellipse(10, 15 - legOffset, 8, 12, 0, 0, Math.PI * 2);
-        ctx.fill();
 
         ctx.restore();
 
@@ -872,6 +1131,10 @@ class GameWorld {
         this.keys = {};
         this.mouseTarget = null;
 
+        // 角色控制模式
+        this.controlMode = 'cat'; // 'cat' 或 'dog'
+        this.playerDog = null; // 当切换到狗模式时创建
+
         this.init();
     }
 
@@ -929,11 +1192,20 @@ class GameWorld {
     update() {
         if (!gameState.running) return;
 
-        // 更新猫（传递目标给猫咪自己处理）
-        this.cat.update(this.keys, this.lights);
+        // 根据控制模式更新角色
+        let controlledEntity;
+        if (this.controlMode === 'cat') {
+            this.cat.update(this.keys, this.lights);
+            controlledEntity = this.cat;
+        } else if (this.controlMode === 'dog' && this.playerDog) {
+            this.playerDog.update(this.keys);
+            controlledEntity = this.playerDog;
+        } else {
+            controlledEntity = this.cat;
+        }
 
-        // 相机跟随
-        this.camera.follow(this.cat);
+        // 相机跟随当前控制的角色
+        this.camera.follow(controlledEntity);
         this.camera.update();
 
         // 更新灯光
@@ -1003,6 +1275,16 @@ class GameWorld {
             obj: this.cat,
             draw: () => this.cat.draw(ctx, this.camera)
         });
+
+        // 添加玩家控制的狗（如果存在）
+        if (this.playerDog) {
+            renderables.push({
+                y: this.playerDog.y,
+                type: 'playerDog',
+                obj: this.playerDog,
+                draw: () => this.playerDog.draw(ctx, this.camera)
+            });
+        }
 
         // 添加出口
         renderables.push({
@@ -1134,15 +1416,19 @@ class GameWorld {
     }
 
     updateUI() {
+        // 根据控制模式更新血量和距离
+        let currentEntity = this.controlMode === 'cat' ? this.cat : (this.playerDog || this.cat);
+
         // 更新血量
-        const healthPercent = Math.max(0, this.cat.health);
+        const healthPercent = Math.max(0, (currentEntity.health / currentEntity.maxHealth) * 100);
         document.getElementById('healthFill').style.width = `${healthPercent}%`;
 
-        // 更新距离
-        const dx = this.exit.x - this.cat.x;
-        const dy = this.exit.y - this.cat.y;
+        // 更新距离和角色提示
+        const dx = this.exit.x - currentEntity.x;
+        const dy = this.exit.y - currentEntity.y;
         const distance = Math.floor(Math.sqrt(dx * dx + dy * dy));
-        document.getElementById('distance').textContent = `距离出口: ${distance}m`;
+        const roleText = this.controlMode === 'cat' ? '🐱 猫咪' : '🐕 狗狗';
+        document.getElementById('distance').textContent = `${roleText} | 距离出口: ${distance}m`;
 
         // 危险警告
         const warningElement = document.getElementById('warning');
@@ -1192,7 +1478,34 @@ class GameWorld {
     }
 
     handleKeyDown(e) {
+        // Tab键切换角色
+        if (e.code === 'Tab') {
+            e.preventDefault(); // 防止浏览器默认行为
+            this.switchControl();
+            return;
+        }
         this.keys[e.code] = true;
+    }
+
+    switchControl() {
+        if (this.controlMode === 'cat') {
+            // 切换到狗模式
+            this.controlMode = 'dog';
+            if (!this.playerDog) {
+                // 在猫的位置创建玩家控制的狗
+                this.playerDog = new PlayerDog(this.cat.x, this.cat.y);
+            }
+            console.log('切换到控制狗');
+        } else {
+            // 切换回猫模式
+            this.controlMode = 'cat';
+            // 将猫传送到狗的位置
+            if (this.playerDog) {
+                this.cat.x = this.playerDog.x;
+                this.cat.y = this.playerDog.y;
+            }
+            console.log('切换到控制猫');
+        }
     }
 
     handleKeyUp(e) {
@@ -1203,9 +1516,14 @@ class GameWorld {
         const rect = canvas.getBoundingClientRect();
         const x = e.clientX - rect.left + this.camera.x;
         const y = e.clientY - rect.top + this.camera.y;
-        // 直接设置猫的目标位置
-        this.cat.targetX = x;
-        this.cat.targetY = y;
+
+        // 根据控制模式设置目标
+        if (this.controlMode === 'cat') {
+            this.cat.targetX = x;
+            this.cat.targetY = y;
+        } else if (this.controlMode === 'dog' && this.playerDog) {
+            this.playerDog.setMouseTarget(x, y);
+        }
         console.log('Set target to:', x, y);
     }
 }
