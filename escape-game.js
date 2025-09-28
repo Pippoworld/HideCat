@@ -59,11 +59,11 @@ catSprite.onload = () => {
 
 // 加载路灯图片
 const lampSprite = new Image();
-lampSprite.src = 'lamp.png';
+lampSprite.src = 'lamp-new.png';  // 使用新的路灯图片
 let lampLoaded = false;
 lampSprite.onload = () => {
     lampLoaded = true;
-    console.log('Lamp sprite loaded');
+    console.log('Lamp sprite loaded:', lampSprite.width, 'x', lampSprite.height);
 };
 
 // 加载狗精灵图
@@ -80,6 +80,22 @@ dogSprite.onload = () => {
     dogSpriteHeight = Math.floor(dogSprite.height / 8);
     console.log('Dog sprite loaded:', dogSprite.width, 'x', dogSprite.height);
     console.log('Each dog sprite:', dogSpriteWidth, 'x', dogSpriteHeight);
+};
+
+// 加载裂纹石板纹理
+const crackedStoneTexture = new Image();
+crackedStoneTexture.src = 'cracked-stone-texture.png'; // 使用正确的纹理图片
+let crackedStoneLoaded = false;
+
+crackedStoneTexture.onload = () => {
+    crackedStoneLoaded = true;
+    console.log('Cracked stone texture loaded:', crackedStoneTexture.width, 'x', crackedStoneTexture.height);
+};
+
+// 如果纹理加载失败，尝试备用路径
+crackedStoneTexture.onerror = () => {
+    console.error('Failed to load cracked stone texture, trying backup...');
+    crackedStoneTexture.src = 'cracked-stone.png';
 };
 
 // 猫咪角色
@@ -480,37 +496,12 @@ class SafeLight {
         const screenX = this.x - camera.x;
         const screenY = this.y - camera.y;
 
-        // 增强的地面照明效果 - 用更亮的叠加层来增加"清晰度"
-        ctx.save();
-        ctx.globalCompositeOperation = 'screen';  // 使用滤色混合模式，让光照区域更亮更清晰
-
-        // 主光圈 - 更强的亮度
-        const gradient = ctx.createRadialGradient(screenX, screenY + 20, 0, screenX, screenY + 20, this.radius);
-        gradient.addColorStop(0, `rgba(255, 245, 180, ${0.6 * this.brightness})`);
-        gradient.addColorStop(0.3, `rgba(255, 240, 150, ${0.4 * this.brightness})`);
-        gradient.addColorStop(0.6, `rgba(255, 235, 120, ${0.2 * this.brightness})`);
-        gradient.addColorStop(1, 'rgba(255, 230, 100, 0)');
-
-        ctx.fillStyle = gradient;
-        ctx.beginPath();
-        ctx.arc(screenX, screenY + 20, this.radius, 0, Math.PI * 2);
-        ctx.fill();
-
-        // 内部高光 - 最亮的中心区域
-        const innerGradient = ctx.createRadialGradient(screenX, screenY + 20, 0, screenX, screenY + 20, this.radius * 0.5);
-        innerGradient.addColorStop(0, `rgba(255, 255, 220, ${0.3 * this.brightness})`);
-        innerGradient.addColorStop(1, 'rgba(255, 255, 200, 0)');
-
-        ctx.fillStyle = innerGradient;
-        ctx.beginPath();
-        ctx.arc(screenX, screenY + 20, this.radius * 0.5, 0, Math.PI * 2);
-        ctx.fill();
-
-        ctx.restore();
+        // 移除过度的光效，只保留微弱的光晕提示
+        // 这部分现在主要用于绘制底座，光照效果将在darkness层处理
 
         // 绘制路灯底座部分（如果图片已加载）
         if (lampLoaded) {
-            const lampHeight = 180;
+            const lampHeight = 200;  // 调整路灯尺寸
             const lampWidth = lampHeight * (lampSprite.width / lampSprite.height);
             const lampTopY = screenY - lampHeight + 20;
 
@@ -537,7 +528,7 @@ class SafeLight {
         // 如果路灯图片已加载，使用图片绘制
         if (lampLoaded) {
             // 绘制路灯图片
-            const lampHeight = 180;  // 增大路灯尺寸
+            const lampHeight = 200;  // 调整路灯尺寸
             const lampWidth = lampHeight * (lampSprite.width / lampSprite.height);
             const lampTopY = screenY - lampHeight + 20;
 
@@ -1135,6 +1126,14 @@ class GameWorld {
         this.controlMode = 'cat'; // 'cat' 或 'dog'
         this.playerDog = null; // 当切换到狗模式时创建
 
+        // 关卡系统
+        this.currentLevel = 1; // 默认关卡1
+        this.levelMenu = document.getElementById('levelMenu');
+
+        // 小地图显示状态
+        this.minimapVisible = false;
+        this.minimapElement = document.querySelector('.minimap');
+
         this.init();
     }
 
@@ -1303,11 +1302,37 @@ class GameWorld {
         // 绘制小地图
         this.drawMinimap();
 
+        // 绘制夜晚黑暗遮罩和光照效果
+        this.drawDarknessWithLights();
+
         // 绘制暗角效果
         this.drawVignette();
     }
 
     drawGround() {
+        switch (this.currentLevel) {
+            case 1:
+                this.drawGroundLevel1();
+                break;
+            case 2:
+                this.drawGroundLevel2();
+                break;
+            case 3:
+                this.drawGroundLevel3();
+                break;
+            case 4:
+                this.drawGroundLevel4();
+                break;
+            case 5:
+                this.drawGroundLevel5();
+                break;
+            default:
+                this.drawGroundLevel1();
+        }
+    }
+
+    drawGroundLevel1() {
+        // 关卡1：经典黑暗街道，棋盘格地面
         const tileSize = 100;
         const startX = Math.floor(this.camera.x / tileSize) * tileSize;
         const startY = Math.floor(this.camera.y / tileSize) * tileSize;
@@ -1317,10 +1342,235 @@ class GameWorld {
                 const screenX = x - this.camera.x;
                 const screenY = y - this.camera.y;
 
-                // 棋盘格图案 - 保持原来的暗色
+                // 棋盘格图案 - 更暗的夜晚色调
                 const isDark = ((x / tileSize) + (y / tileSize)) % 2 === 0;
-                ctx.fillStyle = isDark ? '#0f0f0f' : '#1a1a1a';
+                ctx.fillStyle = isDark ? '#080808' : '#0f0f0f';  // 更暗的基础色
                 ctx.fillRect(screenX, screenY, tileSize, tileSize);
+            }
+        }
+    }
+
+    drawGroundLevel2() {
+        // 关卡2：公园风格，草地和石板路
+        const tileSize = 50;
+        const startX = Math.floor(this.camera.x / tileSize) * tileSize;
+        const startY = Math.floor(this.camera.y / tileSize) * tileSize;
+
+        for (let x = startX; x < startX + VIEWPORT_WIDTH + tileSize; x += tileSize) {
+            for (let y = startY; y < startY + VIEWPORT_HEIGHT + tileSize; y += tileSize) {
+                const screenX = x - this.camera.x;
+                const screenY = y - this.camera.y;
+
+                // 判断是否是路径
+                const tileX = Math.floor(x / tileSize);
+                const tileY = Math.floor(y / tileSize);
+                const isPath = (tileX % 10 === 0 || tileY % 10 === 0) ||
+                               ((tileX % 7 === 3) && (tileY % 7 === 3));
+
+                if (isPath) {
+                    // 石板路
+                    ctx.fillStyle = '#8b8680';
+                    ctx.fillRect(screenX, screenY, tileSize, tileSize);
+
+                    // 石板接缝
+                    ctx.strokeStyle = '#7a756f';
+                    ctx.lineWidth = 1;
+                    ctx.strokeRect(screenX, screenY, tileSize, tileSize);
+                } else {
+                    // 草地底色
+                    const grassShade = Math.random() < 0.5 ? '#2d5016' : '#3a5f1f';
+                    ctx.fillStyle = grassShade;
+                    ctx.fillRect(screenX, screenY, tileSize, tileSize);
+
+                    // 添加草地纹理
+                    ctx.save();
+                    ctx.translate(screenX, screenY);
+
+                    // 绘制几根草
+                    ctx.strokeStyle = '#4a7c28';
+                    ctx.lineWidth = 1;
+                    for (let i = 0; i < 3; i++) {
+                        const grassX = Math.random() * tileSize;
+                        const grassY = Math.random() * tileSize;
+                        ctx.beginPath();
+                        ctx.moveTo(grassX, grassY);
+                        ctx.lineTo(grassX - 2, grassY - 5);
+                        ctx.stroke();
+                        ctx.beginPath();
+                        ctx.moveTo(grassX, grassY);
+                        ctx.lineTo(grassX + 2, grassY - 4);
+                        ctx.stroke();
+                    }
+                    ctx.restore();
+                }
+            }
+        }
+    }
+
+    drawGroundLevel3() {
+        // 关卡3：城市街区，柏油路和人行道
+        const tileSize = 80;
+        const startX = Math.floor(this.camera.x / tileSize) * tileSize;
+        const startY = Math.floor(this.camera.y / tileSize) * tileSize;
+
+        for (let x = startX; x < startX + VIEWPORT_WIDTH + tileSize; x += tileSize) {
+            for (let y = startY; y < startY + VIEWPORT_HEIGHT + tileSize; y += tileSize) {
+                const screenX = x - this.camera.x;
+                const screenY = y - this.camera.y;
+
+                const tileX = Math.floor(x / tileSize);
+                const tileY = Math.floor(y / tileSize);
+
+                // 判断是主路还是人行道
+                const isMainRoad = (tileX % 8 < 5) && (tileY % 8 < 5);
+
+                if (isMainRoad) {
+                    // 柏油路
+                    ctx.fillStyle = '#2c3e50';
+                    ctx.fillRect(screenX, screenY, tileSize, tileSize);
+
+                    // 添加路面纹理
+                    if (Math.random() < 0.1) {
+                        ctx.fillStyle = '#34495e';
+                        ctx.fillRect(screenX + Math.random() * tileSize,
+                                     screenY + Math.random() * tileSize, 5, 5);
+                    }
+
+                    // 路面标线
+                    if (tileX % 4 === 2 && tileY % 2 === 0) {
+                        ctx.fillStyle = '#f39c12';
+                        ctx.fillRect(screenX + tileSize/2 - 2, screenY, 4, tileSize/2);
+                    }
+                } else {
+                    // 人行道
+                    ctx.fillStyle = '#95a5a6';
+                    ctx.fillRect(screenX, screenY, tileSize, tileSize);
+
+                    // 人行道砖块效果
+                    ctx.strokeStyle = '#7f8c8d';
+                    ctx.lineWidth = 1;
+                    ctx.strokeRect(screenX, screenY, tileSize/2, tileSize/2);
+                    ctx.strokeRect(screenX + tileSize/2, screenY, tileSize/2, tileSize/2);
+                    ctx.strokeRect(screenX, screenY + tileSize/2, tileSize/2, tileSize/2);
+                    ctx.strokeRect(screenX + tileSize/2, screenY + tileSize/2, tileSize/2, tileSize/2);
+                }
+            }
+        }
+    }
+
+    drawGroundLevel4() {
+        // 关卡4：混合地形
+        const tileSize = 60;
+        const startX = Math.floor(this.camera.x / tileSize) * tileSize;
+        const startY = Math.floor(this.camera.y / tileSize) * tileSize;
+
+        for (let x = startX; x < startX + VIEWPORT_WIDTH + tileSize; x += tileSize) {
+            for (let y = startY; y < startY + VIEWPORT_HEIGHT + tileSize; y += tileSize) {
+                const screenX = x - this.camera.x;
+                const screenY = y - this.camera.y;
+
+                const tileX = Math.floor(x / tileSize);
+                const tileY = Math.floor(y / tileSize);
+
+                // 使用噪声函数决定地形类型
+                const zone = (tileX * 7 + tileY * 13) % 4;
+
+                switch (zone) {
+                    case 0:
+                        // 草地
+                        ctx.fillStyle = '#3a5f1f';
+                        ctx.fillRect(screenX, screenY, tileSize, tileSize);
+                        break;
+                    case 1:
+                        // 石板
+                        ctx.fillStyle = '#8b8680';
+                        ctx.fillRect(screenX, screenY, tileSize, tileSize);
+                        ctx.strokeStyle = '#7a756f';
+                        ctx.strokeRect(screenX, screenY, tileSize, tileSize);
+                        break;
+                    case 2:
+                        // 泥土
+                        ctx.fillStyle = '#6b4226';
+                        ctx.fillRect(screenX, screenY, tileSize, tileSize);
+                        if (Math.random() < 0.2) {
+                            ctx.fillStyle = '#5a3820';
+                            ctx.fillRect(screenX + Math.random() * tileSize,
+                                       screenY + Math.random() * tileSize, 3, 3);
+                        }
+                        break;
+                    case 3:
+                        // 沙地
+                        ctx.fillStyle = '#c2b280';
+                        ctx.fillRect(screenX, screenY, tileSize, tileSize);
+                        // 沙粒效果
+                        for (let i = 0; i < 3; i++) {
+                            ctx.fillStyle = '#d4c4a0';
+                            ctx.fillRect(screenX + Math.random() * tileSize,
+                                       screenY + Math.random() * tileSize, 1, 1);
+                        }
+                        break;
+                }
+            }
+        }
+    }
+
+    drawGroundLevel5() {
+        // 关卡5：废墟遗迹 - 使用真实的裂纹石板纹理图片
+        if (!crackedStoneLoaded) {
+            // 如果纹理还未加载，使用备用颜色
+            ctx.fillStyle = '#3a3d45';
+            ctx.fillRect(0, 0, VIEWPORT_WIDTH, VIEWPORT_HEIGHT);
+            return;
+        }
+
+        // 获取纹理图片的一个瓦片大小（假设图片是2x2的瓦片）
+        const textureWidth = crackedStoneTexture.width;
+        const textureHeight = crackedStoneTexture.height;
+        const tileWidth = textureWidth / 2;  // 图片包含2x2个瓦片
+        const tileHeight = textureHeight / 2;
+
+        // 游戏中每个瓦片的显示大小
+        const displayTileSize = 85; // 缩小一倍
+
+        const startX = Math.floor(this.camera.x / displayTileSize) * displayTileSize;
+        const startY = Math.floor(this.camera.y / displayTileSize) * displayTileSize;
+
+        // 创建一个模式来平铺纹理
+        for (let x = startX; x < startX + VIEWPORT_WIDTH + displayTileSize; x += displayTileSize) {
+            for (let y = startY; y < startY + VIEWPORT_HEIGHT + displayTileSize; y += displayTileSize) {
+                const screenX = x - this.camera.x;
+                const screenY = y - this.camera.y;
+
+                // 使用瓦片坐标来决定使用纹理的哪个部分
+                const tileX = Math.floor(x / displayTileSize);
+                const tileY = Math.floor(y / displayTileSize);
+
+                // 使用固定的哈希函数来确保同一位置总是使用相同的瓦片
+                // 创造更多变化：使用所有4个瓦片
+                const tileIndex = Math.abs(tileX * 7 + tileY * 11 + tileX * tileY * 3) % 4;
+                const textureIndexX = tileIndex % 2;
+                const textureIndexY = Math.floor(tileIndex / 2);
+
+                // 从纹理图片中切出对应的瓦片
+                ctx.drawImage(
+                    crackedStoneTexture,
+                    textureIndexX * tileWidth,  // 源图片的x位置
+                    textureIndexY * tileHeight, // 源图片的y位置
+                    tileWidth,                  // 源图片的宽度
+                    tileHeight,                 // 源图片的高度
+                    screenX,                    // 目标画布的x位置
+                    screenY,                    // 目标画布的y位置
+                    displayTileSize,            // 目标画布的宽度
+                    displayTileSize             // 目标画布的高度
+                );
+
+                // 添加轻微的边缘暗化效果，增强瓦片之间的区分
+                ctx.save();
+                ctx.globalAlpha = 0.1;
+                ctx.strokeStyle = '#000000';
+                ctx.lineWidth = 1;
+                ctx.strokeRect(screenX, screenY, displayTileSize, displayTileSize);
+                ctx.restore();
             }
         }
     }
@@ -1353,6 +1603,75 @@ class GameWorld {
         });
     }
 
+    drawDarknessWithLights() {
+        // 创建离屏canvas用于处理光照遮罩
+        const offCanvas = document.createElement('canvas');
+        offCanvas.width = VIEWPORT_WIDTH;
+        offCanvas.height = VIEWPORT_HEIGHT;
+        const offCtx = offCanvas.getContext('2d');
+
+        // 1. 首先填充完全黑暗的遮罩
+        offCtx.fillStyle = 'rgba(0, 0, 15, 0.55)';  // 深蓝黑色，55%不透明度（适中的夜晚效果）
+        offCtx.fillRect(0, 0, VIEWPORT_WIDTH, VIEWPORT_HEIGHT);
+
+        // 2. 在灯光位置"挖洞" - 使用渐变擦除黑暗
+        offCtx.globalCompositeOperation = 'destination-out';
+
+        this.lights.forEach(light => {
+            const screenX = light.x - this.camera.x;
+            const screenY = light.y - this.camera.y;
+
+            // 创建渐变的光圈，中心完全透明（擦除黑暗），边缘渐变
+            const lightGradient = offCtx.createRadialGradient(
+                screenX, screenY + 20, 0,
+                screenX, screenY + 20, light.radius
+            );
+
+            // 中心完全擦除（显示原始画面），边缘逐渐恢复黑暗
+            lightGradient.addColorStop(0, 'rgba(255, 255, 255, 1)');     // 中心完全擦除
+            lightGradient.addColorStop(0.3, 'rgba(255, 255, 255, 0.9)'); // 近处大部分擦除
+            lightGradient.addColorStop(0.6, 'rgba(255, 255, 255, 0.5)'); // 中间半透明
+            lightGradient.addColorStop(0.9, 'rgba(255, 255, 255, 0.2)'); // 边缘轻微擦除
+            lightGradient.addColorStop(1, 'rgba(255, 255, 255, 0)');     // 最外围无擦除
+
+            offCtx.fillStyle = lightGradient;
+            offCtx.beginPath();
+            offCtx.arc(screenX, screenY + 20, light.radius, 0, Math.PI * 2);
+            offCtx.fill();
+        });
+
+        // 3. 将处理好的遮罩绘制到主画布
+        ctx.save();
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.drawImage(offCanvas, 0, 0);
+        ctx.restore();
+
+        // 4. 添加非常微弱的暖色光晕（不过度）
+        ctx.save();
+        ctx.globalCompositeOperation = 'screen';
+
+        this.lights.forEach(light => {
+            const screenX = light.x - this.camera.x;
+            const screenY = light.y - this.camera.y;
+
+            // 在灯光中心添加暖色光晕
+            const glowGradient = ctx.createRadialGradient(
+                screenX, screenY + 20, 0,
+                screenX, screenY + 20, light.radius * 0.6  // 扩大暖光范围
+            );
+            glowGradient.addColorStop(0, `rgba(255, 245, 200, ${0.15 * light.brightness})`);  // 增强中心暖光
+            glowGradient.addColorStop(0.5, `rgba(255, 240, 180, ${0.08 * light.brightness})`); // 添加中间层
+            glowGradient.addColorStop(1, 'rgba(255, 235, 160, 0)');
+
+            ctx.fillStyle = glowGradient;
+            ctx.beginPath();
+            ctx.arc(screenX, screenY + 20, light.radius * 0.6, 0, Math.PI * 2);  // 扩大绘制范围匹配渐变
+            ctx.fill();
+        });
+
+        ctx.restore();
+    }
+
     drawVignette() {
         const gradient = ctx.createRadialGradient(
             VIEWPORT_WIDTH / 2, VIEWPORT_HEIGHT / 2, 0,
@@ -1366,6 +1685,11 @@ class GameWorld {
     }
 
     drawMinimap() {
+        // 只在小地图可见时绘制
+        if (!this.minimapVisible) {
+            return;
+        }
+
         // 背景
         minimapCtx.fillStyle = 'rgba(0, 0, 0, 0.8)';
         minimapCtx.fillRect(0, 0, 150, 150);
@@ -1484,7 +1808,31 @@ class GameWorld {
             this.switchControl();
             return;
         }
+
+        // ESC键返回菜单
+        if (e.code === 'Escape') {
+            e.preventDefault();
+            returnToMenu();
+            return;
+        }
+
+        // M键切换小地图显示
+        if (e.code === 'KeyM') {
+            e.preventDefault();
+            this.toggleMinimap();
+            return;
+        }
+
         this.keys[e.code] = true;
+    }
+
+    toggleMinimap() {
+        this.minimapVisible = !this.minimapVisible;
+        if (this.minimapVisible) {
+            this.minimapElement.classList.add('show');
+        } else {
+            this.minimapElement.classList.remove('show');
+        }
     }
 
     switchControl() {
@@ -1555,5 +1903,42 @@ function gameLoop() {
     requestAnimationFrame(gameLoop);
 }
 
-// 启动游戏
-gameLoop();
+// 关卡选择函数
+function startLevel(levelNumber) {
+    // 隐藏菜单
+    const levelMenu = document.getElementById('levelMenu');
+    levelMenu.classList.add('hidden');
+
+    // 重置游戏状态
+    gameState.running = true;
+    gameState.won = false;
+    gameState.paused = false;
+
+    // 创建新的游戏世界并设置关卡
+    game = new GameWorld();
+    game.currentLevel = levelNumber;
+
+    // 清除之前的游戏结束界面
+    document.getElementById('gameOver').classList.remove('show');
+
+    // 启动游戏循环
+    gameLoop();
+}
+
+// 返回菜单函数
+function returnToMenu() {
+    // 停止游戏
+    gameState.running = false;
+    gameState.paused = true;
+
+    // 显示菜单
+    const levelMenu = document.getElementById('levelMenu');
+    levelMenu.classList.remove('hidden');
+}
+
+// 启动时显示菜单，不自动开始游戏
+window.onload = function() {
+    // 确保菜单可见
+    const levelMenu = document.getElementById('levelMenu');
+    levelMenu.classList.remove('hidden');
+};

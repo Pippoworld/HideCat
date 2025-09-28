@@ -39,7 +39,7 @@
         /* 简洁的HUD样式 */
         .hud {
             position: absolute;
-            top: 20px;
+            top: 70px;  /* 移到菜单按钮下方 */
             left: 20px;
             z-index: 100;
         }
@@ -117,6 +117,18 @@
             backdrop-filter: blur(10px);
             z-index: 100;
             padding: 10px;
+            display: none; /* 默认隐藏 */
+            transition: opacity 0.3s ease;
+        }
+
+        .minimap.show {
+            display: block;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: scale(0.9); }
+            to { opacity: 1; transform: scale(1); }
         }
 
         #minimapCanvas {
@@ -230,11 +242,170 @@
             25% { transform: translateX(-48%) translateY(-2px); }
             75% { transform: translateX(-52%) translateY(2px); }
         }
+        /* 关卡选择菜单 */
+        .level-menu {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #1a1a2e 0%, #2c1810 100%);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 2000;
+        }
+
+        .level-menu.hidden {
+            display: none;
+        }
+
+        .menu-title {
+            color: #fff;
+            font-size: 48px;
+            font-weight: bold;
+            margin-bottom: 40px;
+            text-shadow: 3px 3px 6px rgba(0, 0, 0, 0.5);
+        }
+
+        .level-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+            max-width: 600px;
+        }
+
+        .level-card {
+            background: rgba(255, 255, 255, 0.1);
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            border-radius: 15px;
+            padding: 20px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-align: center;
+        }
+
+        .level-card:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: scale(1.05);
+            border-color: #667eea;
+            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.3);
+        }
+
+        .level-number {
+            color: #667eea;
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+
+        .level-name {
+            color: #fff;
+            font-size: 20px;
+            margin-bottom: 10px;
+        }
+
+        .level-description {
+            color: #aaa;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        .back-button {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            padding: 10px 20px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            border-radius: 25px;
+            color: #fff;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .back-button:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        /* 游戏内菜单按钮 */
+        .menu-button {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            padding: 10px 20px;
+            background: rgba(0, 0, 0, 0.6);
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            border-radius: 25px;
+            color: #fff;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            z-index: 150;
+            backdrop-filter: blur(10px);
+            display: none; /* 默认隐藏，游戏开始时显示 */
+        }
+
+        .menu-button:hover {
+            background: rgba(255, 255, 255, 0.15);
+            border-color: #667eea;
+            transform: scale(1.05);
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+        }
+
+        .menu-button:active {
+            transform: scale(0.95);
+        }
+
+        /* 当菜单隐藏时显示菜单按钮 */
+        .level-menu.hidden ~ .menu-button {
+            display: block;
+        }
     </style>
 </head>
 <body>
     <div id="gameContainer">
+        <!-- 关卡选择菜单 -->
+        <div class="level-menu" id="levelMenu">
+            <h1 class="menu-title">🐱 选择关卡</h1>
+            <div class="level-grid">
+                <div class="level-card" onclick="startLevel(1)">
+                    <div class="level-number">关卡 1</div>
+                    <div class="level-name">夜晚都市</div>
+                    <div class="level-description">经典的黑暗街道<br>简洁的棋盘格地面</div>
+                </div>
+                <div class="level-card" onclick="startLevel(2)">
+                    <div class="level-number">关卡 2</div>
+                    <div class="level-name">公园漫步</div>
+                    <div class="level-description">绿色草地环境<br>石板小径穿梭其中</div>
+                </div>
+                <div class="level-card" onclick="startLevel(3)">
+                    <div class="level-number">关卡 3</div>
+                    <div class="level-name">城市街区</div>
+                    <div class="level-description">柏油马路和人行道<br>都市风格场景</div>
+                </div>
+                <div class="level-card" onclick="startLevel(4)">
+                    <div class="level-number">关卡 4</div>
+                    <div class="level-name">混合地带</div>
+                    <div class="level-description">多种地形混合<br>丰富的场景变化</div>
+                </div>
+                <div class="level-card" onclick="startLevel(5)" style="border-color: #e74c3c;">
+                    <div class="level-number" style="color: #e74c3c;">关卡 5</div>
+                    <div class="level-name">废墟遗迹</div>
+                    <div class="level-description">破碎的石板地面<br>裂纹纵横的古老道路</div>
+                </div>
+            </div>
+        </div>
+
         <canvas id="gameCanvas" width="900" height="700"></canvas>
+
+        <!-- 菜单按钮 -->
+        <button class="menu-button" id="menuButton" onclick="returnToMenu()">
+            ☰ 菜单
+        </button>
 
         <div class="hud">
             <!-- 血条 -->
@@ -260,7 +431,7 @@
         <div class="warning" id="warning">⚠️ 危险！野狗接近中！</div>
 
         <div class="controls">
-            点击地面移动 | WASD 或 方向键控制 | 按住 Shift 奔跑 | 按 Tab 切换角色
+            点击地面移动 | WASD 或 方向键控制 | 按住 Shift 奔跑 | 按 Tab 切换角色 | 按 M 显示小地图 | 按 ESC 返回菜单
         </div>
 
         <div class="game-over" id="gameOver">
