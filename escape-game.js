@@ -1057,6 +1057,205 @@ class WildDog {
     }
 }
 
+// 场景装饰物
+class Decoration {
+    constructor(x, y, type) {
+        this.x = x;
+        this.y = y;
+        this.type = type; // 'bench', 'flowerbed', 'fountain', 'sign'
+        this.animationFrame = Math.random() * 100;
+    }
+
+    draw(ctx, camera) {
+        const screenX = this.x - camera.x;
+        const screenY = this.y - camera.y;
+
+        ctx.save();
+        ctx.translate(screenX, screenY);
+
+        switch(this.type) {
+            case 'bench':
+                this.drawBench(ctx);
+                break;
+            case 'flowerbed':
+                this.drawFlowerbed(ctx);
+                break;
+            case 'fountain':
+                this.drawFountain(ctx);
+                break;
+            case 'sign':
+                this.drawSign(ctx);
+                break;
+        }
+
+        ctx.restore();
+    }
+
+    drawBench(ctx) {
+        // 长椅影子
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+        ctx.fillRect(-40, 15, 80, 20);
+
+        // 长椅座位
+        ctx.fillStyle = '#8B4513';
+        ctx.fillRect(-35, -5, 70, 15);
+
+        // 长椅靠背
+        ctx.fillStyle = '#654321';
+        ctx.fillRect(-35, -20, 70, 15);
+
+        // 长椅腿
+        ctx.fillStyle = '#333';
+        ctx.fillRect(-30, 10, 5, 10);
+        ctx.fillRect(25, 10, 5, 10);
+    }
+
+    drawFlowerbed(ctx) {
+        // 花坛边框
+        ctx.strokeStyle = '#5a5a5a';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.ellipse(0, 5, 35, 20, 0, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // 泥土
+        ctx.fillStyle = '#4a3528';
+        ctx.beginPath();
+        ctx.ellipse(0, 5, 32, 17, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // 花朵
+        const flowers = [
+            {x: -15, y: 0, color: '#ff6b9d'},
+            {x: 0, y: -5, color: '#feca57'},
+            {x: 15, y: 2, color: '#ee5a6f'},
+            {x: -8, y: 8, color: '#c44569'},
+            {x: 10, y: -3, color: '#f8b500'}
+        ];
+
+        flowers.forEach(flower => {
+            // 花茎
+            ctx.strokeStyle = '#2d5016';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(flower.x, flower.y + 5);
+            ctx.lineTo(flower.x, flower.y - 5);
+            ctx.stroke();
+
+            // 花瓣
+            ctx.fillStyle = flower.color;
+            for (let i = 0; i < 5; i++) {
+                const angle = (i * 72) * Math.PI / 180;
+                const petalX = flower.x + Math.cos(angle) * 6;
+                const petalY = flower.y - 5 + Math.sin(angle) * 6;
+                ctx.beginPath();
+                ctx.arc(petalX, petalY, 3, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            // 花心
+            ctx.fillStyle = '#ffd93d';
+            ctx.beginPath();
+            ctx.arc(flower.x, flower.y - 5, 2, 0, Math.PI * 2);
+            ctx.fill();
+        });
+    }
+
+    drawFountain(ctx) {
+        // 喷泉基座
+        ctx.fillStyle = '#7a7a7a';
+        ctx.beginPath();
+        ctx.ellipse(0, 20, 45, 25, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // 水池边缘
+        ctx.strokeStyle = '#5a5a5a';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.ellipse(0, 20, 45, 25, 0, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // 中心柱
+        ctx.fillStyle = '#8a8a8a';
+        ctx.fillRect(-8, -10, 16, 30);
+
+        // 水效果
+        this.animationFrame += 0.1;
+
+        // 水柱
+        ctx.strokeStyle = 'rgba(150, 200, 255, 0.6)';
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.moveTo(0, -10);
+        ctx.lineTo(0, -30 - Math.sin(this.animationFrame) * 5);
+        ctx.stroke();
+
+        // 水花
+        for (let i = 0; i < 8; i++) {
+            const angle = (i * 45 + this.animationFrame * 10) * Math.PI / 180;
+            const distance = 15 + Math.sin(this.animationFrame + i) * 5;
+            const dropX = Math.cos(angle) * distance;
+            const dropY = -20 + Math.sin(angle) * distance / 2;
+
+            ctx.fillStyle = 'rgba(150, 200, 255, 0.4)';
+            ctx.beginPath();
+            ctx.arc(dropX, dropY, 2, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        // 水面波纹
+        ctx.strokeStyle = 'rgba(150, 200, 255, 0.3)';
+        ctx.lineWidth = 1;
+        for (let i = 0; i < 3; i++) {
+            const rippleSize = 20 + (this.animationFrame * 10 + i * 15) % 30;
+            ctx.globalAlpha = Math.max(0, 1 - rippleSize / 30) * 0.3;
+            ctx.beginPath();
+            ctx.ellipse(0, 20, rippleSize, rippleSize * 0.6, 0, 0, Math.PI * 2);
+            ctx.stroke();
+        }
+        ctx.globalAlpha = 1;
+    }
+
+    drawSign(ctx) {
+        // 杆子
+        ctx.fillStyle = '#4a4a4a';
+        ctx.fillRect(-3, 0, 6, 40);
+
+        // 路牌
+        ctx.fillStyle = '#2c5aa0';
+        ctx.fillRect(-25, -30, 50, 25);
+
+        // 边框
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(-25, -30, 50, 25);
+
+        // 文字
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold 10px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText('EXIT →', 0, -15);
+
+        // 箭头
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(15, -10);
+        ctx.lineTo(20, -10);
+        ctx.moveTo(18, -12);
+        ctx.lineTo(20, -10);
+        ctx.lineTo(18, -8);
+        ctx.stroke();
+    }
+
+    update() {
+        // 喷泉动画更新
+        if (this.type === 'fountain') {
+            this.animationFrame += 0.1;
+        }
+    }
+}
+
 // 出口
 class Exit {
     constructor(x, y) {
@@ -1127,6 +1326,7 @@ class GameWorld {
         this.exit = null;
         this.particles = [];
         this.obstacles = [];
+        this.decorations = []; // 场景装饰物
 
         this.keys = {};
         this.mouseTarget = null;
@@ -1165,6 +1365,43 @@ class GameWorld {
             } else {
                 i--; // 重新生成
             }
+        }
+
+        // 生成装饰物
+        // 长椅
+        for (let i = 0; i < 8; i++) {
+            this.decorations.push(new Decoration(
+                Math.random() * WORLD_WIDTH,
+                Math.random() * WORLD_HEIGHT,
+                'bench'
+            ));
+        }
+
+        // 花坛
+        for (let i = 0; i < 15; i++) {
+            this.decorations.push(new Decoration(
+                Math.random() * WORLD_WIDTH,
+                Math.random() * WORLD_HEIGHT,
+                'flowerbed'
+            ));
+        }
+
+        // 喷泉（少一些）
+        for (let i = 0; i < 3; i++) {
+            this.decorations.push(new Decoration(
+                300 + Math.random() * (WORLD_WIDTH - 600),
+                300 + Math.random() * (WORLD_HEIGHT - 600),
+                'fountain'
+            ));
+        }
+
+        // 路牌
+        for (let i = 0; i < 6; i++) {
+            this.decorations.push(new Decoration(
+                Math.random() * WORLD_WIDTH,
+                Math.random() * WORLD_HEIGHT,
+                'sign'
+            ));
         }
 
         // 生成出口（在地图边缘）
@@ -1211,6 +1448,9 @@ class GameWorld {
         // 更新灯光
         this.lights.forEach(light => light.update());
 
+        // 更新装饰物
+        this.decorations.forEach(decoration => decoration.update());
+
         // 更新野狗
         this.dogs.forEach(dog => dog.update(this.cat, this.lights));
 
@@ -1247,6 +1487,16 @@ class GameWorld {
 
         // 收集所有需要按Y轴排序的对象
         const renderables = [];
+
+        // 添加装饰物
+        this.decorations.forEach(decoration => {
+            renderables.push({
+                y: decoration.y,
+                type: 'decoration',
+                obj: decoration,
+                draw: () => decoration.draw(ctx, this.camera)
+            });
+        });
 
         // 添加路灯的灯杆部分
         this.lights.forEach(light => {
@@ -1308,21 +1558,137 @@ class GameWorld {
     }
 
     drawGround() {
-        const tileSize = 100;
+        const tileSize = 50;
         const startX = Math.floor(this.camera.x / tileSize) * tileSize;
         const startY = Math.floor(this.camera.y / tileSize) * tileSize;
 
+        // 先绘制草地背景
         for (let x = startX; x < startX + VIEWPORT_WIDTH + tileSize; x += tileSize) {
             for (let y = startY; y < startY + VIEWPORT_HEIGHT + tileSize; y += tileSize) {
                 const screenX = x - this.camera.x;
                 const screenY = y - this.camera.y;
 
-                // 棋盘格图案 - 保持原来的暗色
-                const isDark = ((x / tileSize) + (y / tileSize)) % 2 === 0;
-                ctx.fillStyle = isDark ? '#0f0f0f' : '#1a1a1a';
+                // 使用伪随机生成草地色调变化
+                const seed = (x * 7 + y * 13) % 100;
+                const grassVariant = seed % 4;
+
+                // 不同深浅的草绿色
+                const grassColors = [
+                    '#1a3d1a',  // 深绿
+                    '#1f4a1f',  // 中深绿
+                    '#245224',  // 中绿
+                    '#1d441d'   // 暗绿
+                ];
+
+                ctx.fillStyle = grassColors[grassVariant];
                 ctx.fillRect(screenX, screenY, tileSize, tileSize);
+
+                // 添加草地纹理细节
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
+                ctx.beginPath();
+                for (let i = 0; i < 3; i++) {
+                    const grassX = screenX + (seed * 17 + i * 23) % tileSize;
+                    const grassY = screenY + (seed * 13 + i * 19) % tileSize;
+                    ctx.moveTo(grassX, grassY);
+                    ctx.lineTo(grassX - 1, grassY - 5);
+                    ctx.lineTo(grassX + 1, grassY - 5);
+                }
+                ctx.fill();
+
+                // 随机添加小装饰（落叶、小花等）
+                if (seed < 5) {
+                    // 落叶
+                    ctx.save();
+                    ctx.translate(screenX + tileSize/2, screenY + tileSize/2);
+                    ctx.rotate((seed * 45) * Math.PI / 180);
+                    ctx.fillStyle = seed % 2 ? '#4a3a1a' : '#5a4a2a';
+                    ctx.beginPath();
+                    ctx.ellipse(0, 0, 4, 2, 0, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.restore();
+                } else if (seed < 8) {
+                    // 小花
+                    ctx.fillStyle = seed % 2 ? '#ffeb3b' : '#ff9800';
+                    ctx.beginPath();
+                    ctx.arc(screenX + (seed * 7) % tileSize, screenY + (seed * 11) % tileSize, 2, 0, Math.PI * 2);
+                    ctx.fill();
+                }
             }
         }
+
+        // 绘制石板路径
+        this.drawPaths();
+    }
+
+    drawPaths() {
+        // 主要路径数据
+        const paths = [
+            // 横向主路
+            {x: 0, y: 1500, width: WORLD_WIDTH, height: 120},
+            // 纵向主路
+            {x: 1500, y: 0, width: 120, height: WORLD_HEIGHT},
+            // 对角路径
+            {x: 500, y: 500, width: 100, height: 2000, angle: 45},
+            {x: 2500, y: 500, width: 100, height: 2000, angle: -45}
+        ];
+
+        ctx.save();
+
+        paths.forEach(path => {
+            // 计算可见区域
+            if (path.x < this.camera.x + VIEWPORT_WIDTH &&
+                path.x + path.width > this.camera.x &&
+                path.y < this.camera.y + VIEWPORT_HEIGHT &&
+                path.y + path.height > this.camera.y) {
+
+                const screenX = path.x - this.camera.x;
+                const screenY = path.y - this.camera.y;
+
+                ctx.save();
+
+                if (path.angle) {
+                    ctx.translate(screenX + path.width/2, screenY + path.height/2);
+                    ctx.rotate(path.angle * Math.PI / 180);
+                    ctx.translate(-path.width/2, -path.height/2);
+                    this.drawStonePath(0, 0, path.width, path.height);
+                } else {
+                    this.drawStonePath(screenX, screenY, path.width, path.height);
+                }
+
+                ctx.restore();
+            }
+        });
+
+        ctx.restore();
+    }
+
+    drawStonePath(x, y, width, height) {
+        // 路径底色
+        ctx.fillStyle = '#3a3a3a';
+        ctx.fillRect(x, y, width, height);
+
+        // 石板纹理
+        const stoneSize = 40;
+        for (let sx = x; sx < x + width; sx += stoneSize) {
+            for (let sy = y; sy < y + height; sy += stoneSize) {
+                // 石板颜色变化
+                const variant = ((sx + sy) / stoneSize) % 3;
+                const stoneColors = ['#4a4a4a', '#3d3d3d', '#454545'];
+
+                ctx.fillStyle = stoneColors[Math.floor(variant)];
+                ctx.fillRect(sx + 1, sy + 1, stoneSize - 2, stoneSize - 2);
+
+                // 石板缝隙
+                ctx.strokeStyle = '#2a2a2a';
+                ctx.lineWidth = 1;
+                ctx.strokeRect(sx, sy, stoneSize, stoneSize);
+            }
+        }
+
+        // 路径边缘
+        ctx.strokeStyle = '#2a2a2a';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(x, y, width, height);
     }
 
     drawObstacles() {
