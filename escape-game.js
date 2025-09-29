@@ -471,7 +471,7 @@ class Cat {
 
 // 灯光安全区
 class SafeLight {
-    constructor(x, y, radius = 170) {
+    constructor(x, y, radius = 250) {  // 增大光照范围，与路灯原始尺寸匹配
         this.x = x;
         this.y = y;
         this.radius = radius;
@@ -501,8 +501,8 @@ class SafeLight {
 
         // 绘制路灯底座部分（如果图片已加载）
         if (lampLoaded) {
-            const lampHeight = 200;  // 调整路灯尺寸
-            const lampWidth = lampHeight * (lampSprite.width / lampSprite.height);
+            const lampHeight = lampSprite.height;  // 使用原始高度
+            const lampWidth = lampSprite.width;    // 使用原始宽度
             const lampTopY = screenY - lampHeight + 20;
 
             // 只绘制底座部分（图片底部约33%的部分 - 包含完整石头底座）
@@ -528,8 +528,8 @@ class SafeLight {
         // 如果路灯图片已加载，使用图片绘制
         if (lampLoaded) {
             // 绘制路灯图片
-            const lampHeight = 200;  // 调整路灯尺寸
-            const lampWidth = lampHeight * (lampSprite.width / lampSprite.height);
+            const lampHeight = lampSprite.height;  // 使用原始高度
+            const lampWidth = lampSprite.width;    // 使用原始宽度
             const lampTopY = screenY - lampHeight + 20;
 
             // 先绘制灯泡位置的点光源光晕
@@ -1342,9 +1342,9 @@ class GameWorld {
                 const screenX = x - this.camera.x;
                 const screenY = y - this.camera.y;
 
-                // 棋盘格图案 - 更暗的夜晚色调
+                // 棋盘格图案 - 调亮基础色
                 const isDark = ((x / tileSize) + (y / tileSize)) % 2 === 0;
-                ctx.fillStyle = isDark ? '#080808' : '#0f0f0f';  // 更暗的基础色
+                ctx.fillStyle = isDark ? '#1a1a1a' : '#252525';  // 更亮的基础色
                 ctx.fillRect(screenX, screenY, tileSize, tileSize);
             }
         }
