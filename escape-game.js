@@ -1611,7 +1611,7 @@ class GameWorld {
         const offCtx = offCanvas.getContext('2d');
 
         // 1. 首先填充完全黑暗的遮罩 - 纯黑色
-        offCtx.fillStyle = 'rgba(0, 0, 0, 0.85)';  // 纯黑色，85%不透明度
+        offCtx.fillStyle = 'rgba(0, 0, 0, 0.65)';  // 纯黑色，65%不透明度，让暗区更亮一些
         offCtx.fillRect(0, 0, VIEWPORT_WIDTH, VIEWPORT_HEIGHT);
 
         // 2. 在灯光位置"挖洞" - 优化擦除曲线
@@ -1627,13 +1627,14 @@ class GameWorld {
                 screenX, screenY - 20, light.radius  // 标准光照范围
             );
 
-            // 极端硬边缘效果 - 完全模仿参考游戏
+            // 硬边缘效果，外围自然过渡
             lightGradient.addColorStop(0, 'rgba(255, 255, 255, 1)');      // 中心100%清晰
             lightGradient.addColorStop(0.7, 'rgba(255, 255, 255, 1)');    // 70%范围内完全清晰
-            lightGradient.addColorStop(0.75, 'rgba(255, 255, 255, 0.8)'); // 急剧衰减
-            lightGradient.addColorStop(0.8, 'rgba(255, 255, 255, 0.5)');  // 快速变暗
-            lightGradient.addColorStop(0.85, 'rgba(255, 255, 255, 0.2)'); // 很暗
-            lightGradient.addColorStop(0.9, 'rgba(255, 255, 255, 0.05)'); // 几乎全黑
+            lightGradient.addColorStop(0.75, 'rgba(255, 255, 255, 0.85)'); // 开始衰减
+            lightGradient.addColorStop(0.8, 'rgba(255, 255, 255, 0.65)');  // 逐渐变暗
+            lightGradient.addColorStop(0.85, 'rgba(255, 255, 255, 0.4)');  // 继续变暗
+            lightGradient.addColorStop(0.9, 'rgba(255, 255, 255, 0.2)');   // 较暗
+            lightGradient.addColorStop(0.95, 'rgba(255, 255, 255, 0.08)'); // 很暗
             lightGradient.addColorStop(1, 'rgba(255, 255, 255, 0)');      // 完全黑暗
 
             offCtx.fillStyle = lightGradient;
