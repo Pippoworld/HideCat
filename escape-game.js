@@ -98,6 +98,29 @@ crackedStoneTexture.onerror = () => {
     crackedStoneTexture.src = 'cracked-stone.png';
 };
 
+// 辅助：根据光源方向绘制拉长椭圆阴影
+function drawShadowFor(lctx, x, y, lightX, lightY, size = 28) {
+    const dx = x - lightX, dy = y - lightY;
+    const dist = Math.hypot(dx, dy) + 1;
+    const nx = dx / dist, ny = dy / dist;
+    const sx = x + nx * Math.min(90, dist * 0.6);
+    const sy = y + ny * Math.min(90, dist * 0.6);
+
+    lctx.save();
+    lctx.globalCompositeOperation = 'source-over';
+    lctx.fillStyle = 'rgba(0,0,0,0.65)';
+    lctx.translate(sx, sy);
+    lctx.rotate(Math.atan2(ny, nx));
+    const w = size * (1 + Math.min(1, dist / 240));
+    const h = size * 0.45;
+    lctx.filter = 'blur(3px)';
+    lctx.beginPath();
+    lctx.ellipse(0, 0, w, h, 0, 0, Math.PI * 2);
+    lctx.fill();
+    lctx.filter = 'none';
+    lctx.restore();
+}
+
 // 猫咪角色
 class Cat {
     constructor(x, y) {
@@ -471,7 +494,7 @@ class Cat {
 
 // 灯光安全区
 class SafeLight {
-    constructor(x, y, radius = 170) {
+    constructor(x, y, radius = 250) {  // 增大光照范围，与路灯原始尺寸匹配
         this.x = x;
         this.y = y;
         this.radius = radius;
@@ -501,8 +524,8 @@ class SafeLight {
 
         // 绘制路灯底座部分（如果图片已加载）
         if (lampLoaded) {
-            const lampHeight = 200;  // 调整路灯尺寸
-            const lampWidth = lampHeight * (lampSprite.width / lampSprite.height);
+            const lampHeight = lampSprite.height;  // 使用原始高度
+            const lampWidth = lampSprite.width;    // 使用原始宽度
             const lampTopY = screenY - lampHeight + 20;
 
             // 只绘制底座部分（图片底部约33%的部分 - 包含完整石头底座）
@@ -527,9 +550,9 @@ class SafeLight {
 
         // 如果路灯图片已加载，使用图片绘制
         if (lampLoaded) {
-            // 绘制路灯图片
-            const lampHeight = 200;  // 调整路灯尺寸
-            const lampWidth = lampHeight * (lampSprite.width / lampSprite.height);
+            // 使用原图尺寸（1:1显示）
+            const lampHeight = lampSprite.height;  // 使用原始高度
+            const lampWidth = lampSprite.width;    // 使用原始宽度
             const lampTopY = screenY - lampHeight + 20;
 
             // 先绘制灯泡位置的点光源光晕
@@ -1134,6 +1157,27 @@ class GameWorld {
         this.minimapVisible = false;
         this.minimapElement = document.querySelector('.minimap');
 
+        // 复用的光照离屏层与上下文
+        this.lightLayer = document.createElement('canvas');
+        this.lightLayer.width = VIEWPORT_WIDTH;
+        this.lightLayer.height = VIEWPORT_HEIGHT;
+        this.lightCtx = this.lightLayer.getContext('2d');
+
+        // 预生成一张小噪声纹理作为光纹理 cookie（让光斑不那么完美）
+        this.cookie = document.createElement('canvas');
+        this.cookie.width = 128;
+        this.cookie.height = 128;
+        const ck = this.cookie.getContext('2d');
+        const img = ck.createImageData(128, 128);
+        for (let i = 0; i < img.data.length; i += 4) {
+            const v = (Math.random() * 255) | 0;
+            img.data[i] = v;
+            img.data[i + 1] = v;
+            img.data[i + 2] = v;
+            img.data[i + 3] = 55 + (v % 30);
+        }
+        ck.putImageData(img, 0, 0);
+
         this.init();
     }
 
@@ -1342,9 +1386,9 @@ class GameWorld {
                 const screenX = x - this.camera.x;
                 const screenY = y - this.camera.y;
 
-                // 棋盘格图案 - 更暗的夜晚色调
+                // 棋盘格图案 - 调亮基础色
                 const isDark = ((x / tileSize) + (y / tileSize)) % 2 === 0;
-                ctx.fillStyle = isDark ? '#080808' : '#0f0f0f';  // 更暗的基础色
+                ctx.fillStyle = isDark ? '#1a1a1a' : '#252525';  // 更亮的基础色
                 ctx.fillRect(screenX, screenY, tileSize, tileSize);
             }
         }
@@ -1604,75 +1648,92 @@ class GameWorld {
     }
 
     drawDarknessWithLights() {
-        // 创建离屏canvas用于处理光照遮罩
-        const offCanvas = document.createElement('canvas');
-        offCanvas.width = VIEWPORT_WIDTH;
-        offCanvas.height = VIEWPORT_HEIGHT;
-        const offCtx = offCanvas.getContext('2d');
+        // 复用离屏光照层
+        const layer = this.lightLayer;
+        const lctx = this.lightCtx;
+        if (layer.width !== VIEWPORT_WIDTH || layer.height !== VIEWPORT_HEIGHT) {
+            layer.width = VIEWPORT_WIDTH;
+            layer.height = VIEWPORT_HEIGHT;
+        }
 
-        // 1. 首先填充完全黑暗的遮罩 - 纯黑色
-        offCtx.fillStyle = 'rgba(0, 0, 0, 0.65)';  // 纯黑色，65%不透明度，让暗区更亮一些
-        offCtx.fillRect(0, 0, VIEWPORT_WIDTH, VIEWPORT_HEIGHT);
+        // 1) 冷暗环境层（稍带蓝色的夜晚）
+        lctx.setTransform(1, 0, 0, 1, 0, 0);
+        lctx.globalCompositeOperation = 'source-over';
+        lctx.clearRect(0, 0, layer.width, layer.height);
+        lctx.fillStyle = 'rgba(12,16,22,0.92)';
+        lctx.fillRect(0, 0, layer.width, layer.height);
 
-        // 2. 在灯光位置"挖洞" - 优化擦除曲线
-        offCtx.globalCompositeOperation = 'destination-out';
-
+        // 2) 方向性光锥：destination-out 挖掉暗层
         this.lights.forEach(light => {
             const screenX = light.x - this.camera.x;
-            const screenY = light.y - this.camera.y;
+            const screenY = light.y - this.camera.y - 20; // 灯头
 
-            // 创建硬边缘光圈 - 完全模仿参考游戏
-            const lightGradient = offCtx.createRadialGradient(
-                screenX, screenY - 20, 0,  // 修正：光源在灯杆顶部
-                screenX, screenY - 20, light.radius  // 标准光照范围
-            );
+            lctx.save();
+            lctx.translate(screenX, screenY);
+            const spread = Math.PI * 0.45; // 光锥角度
+            const tilt = Math.PI * 0.08;   // 轻微偏转
+            lctx.rotate(tilt);
 
-            // 硬边缘效果，外围自然过渡
-            lightGradient.addColorStop(0, 'rgba(255, 255, 255, 1)');      // 中心100%清晰
-            lightGradient.addColorStop(0.7, 'rgba(255, 255, 255, 1)');    // 70%范围内完全清晰
-            lightGradient.addColorStop(0.75, 'rgba(255, 255, 255, 0.85)'); // 开始衰减
-            lightGradient.addColorStop(0.8, 'rgba(255, 255, 255, 0.65)');  // 逐渐变暗
-            lightGradient.addColorStop(0.85, 'rgba(255, 255, 255, 0.4)');  // 继续变暗
-            lightGradient.addColorStop(0.9, 'rgba(255, 255, 255, 0.2)');   // 较暗
-            lightGradient.addColorStop(0.95, 'rgba(255, 255, 255, 0.08)'); // 很暗
-            lightGradient.addColorStop(1, 'rgba(255, 255, 255, 0)');      // 完全黑暗
+            lctx.beginPath();
+            lctx.moveTo(0, 0);
+            lctx.arc(0, 0, light.radius, -spread / 2, spread / 2);
+            lctx.closePath();
 
-            offCtx.fillStyle = lightGradient;
-            offCtx.beginPath();
-            offCtx.arc(screenX, screenY - 20, light.radius, 0, Math.PI * 2);  // 修正：光圈中心在灯杆顶部
-            offCtx.fill();
+            const g = lctx.createRadialGradient(0, 0, 8, 0, light.radius * 0.5, light.radius);
+            g.addColorStop(0.00, 'rgba(255,255,255,0.98)');
+            g.addColorStop(0.25, 'rgba(255,255,255,0.60)');
+            g.addColorStop(0.60, 'rgba(255,255,255,0.18)');
+            g.addColorStop(1.00, 'rgba(255,255,255,0.00)');
+
+            lctx.globalCompositeOperation = 'destination-out';
+            lctx.fillStyle = g;
+            lctx.fill();
+            lctx.restore();
         });
 
-        // 3. 将处理好的遮罩绘制到主画布
+        // 2.5) 光纹理 cookie：添加轻微不均匀
+        lctx.globalCompositeOperation = 'destination-out';
+        lctx.globalAlpha = 0.28;
+        for (let yy = 0; yy < layer.height; yy += this.cookie.height) {
+            for (let xx = 0; xx < layer.width; xx += this.cookie.width) {
+                lctx.drawImage(this.cookie, xx, yy);
+            }
+        }
+        lctx.globalAlpha = 1;
+
+        // 3) 定向阴影：角色、狗、灯座
+        this.lights.forEach(light => {
+            const lx = light.x - this.camera.x;
+            const ly = light.y - this.camera.y - 20;
+            drawShadowFor(lctx, this.cat.x - this.camera.x, this.cat.y - this.camera.y, lx, ly, 24);
+            this.dogs.forEach(d => {
+                drawShadowFor(lctx, d.x - this.camera.x, d.y - this.camera.y, lx, ly, 28);
+            });
+            // 灯杆自身影（以灯座位置近似）
+            drawShadowFor(lctx, lx, ly + 110, lx, ly, 18);
+        });
+
+        // 4) 合成：multiply 暗化主画面
         ctx.save();
-        ctx.globalCompositeOperation = 'source-over';
-        ctx.drawImage(offCanvas, 0, 0);
+        ctx.globalCompositeOperation = 'multiply';
+        ctx.drawImage(layer, 0, 0);
         ctx.restore();
 
-        // 4. 移除灯泡光晕效果（暂时注释掉）
-        // ctx.save();
-        // ctx.globalCompositeOperation = 'screen';
-
-        // this.lights.forEach(light => {
-        //     const screenX = light.x - this.camera.x;
-        //     const screenY = light.y - this.camera.y;
-
-        //     // 只有灯泡位置的小光晕
-        //     const bulbGlow = ctx.createRadialGradient(
-        //         screenX, screenY - 20, 0,
-        //         screenX, screenY - 20, 15
-        //     );
-        //     bulbGlow.addColorStop(0, `rgba(255, 255, 200, ${0.3 * light.brightness})`);
-        //     bulbGlow.addColorStop(0.5, `rgba(255, 250, 180, ${0.15 * light.brightness})`);
-        //     bulbGlow.addColorStop(1, 'rgba(255, 245, 160, 0)');
-
-        //     ctx.fillStyle = bulbGlow;
-        //     ctx.beginPath();
-        //     ctx.arc(screenX, screenY - 20, 15, 0, Math.PI * 2);
-        //     ctx.fill();
-        // });
-
-        // ctx.restore();
+        // 5) 灯泡暖色小辉光（更真实的暖色点光）
+        ctx.save();
+        ctx.globalCompositeOperation = 'screen';
+        this.lights.forEach(light => {
+            const sx = light.x - this.camera.x;
+            const sy = light.y - this.camera.y - 20;
+            const glow = ctx.createRadialGradient(sx, sy, 0, sx, sy, 26);
+            glow.addColorStop(0, 'rgba(255,210,140,0.45)');
+            glow.addColorStop(1, 'rgba(255,210,140,0)');
+            ctx.fillStyle = glow;
+            ctx.beginPath();
+            ctx.arc(sx, sy, 26, 0, Math.PI * 2);
+            ctx.fill();
+        });
+        ctx.restore();
     }
 
     drawVignette() {
