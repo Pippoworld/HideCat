@@ -11,7 +11,9 @@
       "Bash(git branch:*)",
       "Bash(git push:*)",
       "Read(//var/folders/s3/sn5f6ttx2q1c4vx5q2c6lp980000gn/T/TemporaryItems/NSIRD_screencaptureui_CN6zDh/**)",
-      "Read(//private/var/folders/s3/sn5f6ttx2q1c4vx5q2c6lp980000gn/T/TemporaryItems/**)"
+      "Read(//private/var/folders/s3/sn5f6ttx2q1c4vx5q2c6lp980000gn/T/TemporaryItems/**)",
+      "Read(//var/folders/s3/sn5f6ttx2q1c4vx5q2c6lp980000gn/T/TemporaryItems/NSIRD_screencaptureui_mDqRDs/**)",
+      "Read(//var/folders/s3/sn5f6ttx2q1c4vx5q2c6lp980000gn/T/TemporaryItems/NSIRD_screencaptureui_Ns4hNe/**)"
     ],
     "deny": [],
     "ask": []

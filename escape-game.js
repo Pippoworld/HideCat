@@ -1610,33 +1610,35 @@ class GameWorld {
         offCanvas.height = VIEWPORT_HEIGHT;
         const offCtx = offCanvas.getContext('2d');
 
-        // 1. 首先填充完全黑暗的遮罩
-        offCtx.fillStyle = 'rgba(0, 0, 15, 0.55)';  // 深蓝黑色，55%不透明度（适中的夜晚效果）
+        // 1. 首先填充完全黑暗的遮罩 - 纯黑色
+        offCtx.fillStyle = 'rgba(0, 0, 0, 0.85)';  // 纯黑色，85%不透明度
         offCtx.fillRect(0, 0, VIEWPORT_WIDTH, VIEWPORT_HEIGHT);
 
-        // 2. 在灯光位置"挖洞" - 使用渐变擦除黑暗
+        // 2. 在灯光位置"挖洞" - 优化擦除曲线
         offCtx.globalCompositeOperation = 'destination-out';
 
         this.lights.forEach(light => {
             const screenX = light.x - this.camera.x;
             const screenY = light.y - this.camera.y;
 
-            // 创建渐变的光圈，中心完全透明（擦除黑暗），边缘渐变
+            // 创建硬边缘光圈 - 完全模仿参考游戏
             const lightGradient = offCtx.createRadialGradient(
-                screenX, screenY + 20, 0,
-                screenX, screenY + 20, light.radius
+                screenX, screenY - 20, 0,  // 修正：光源在灯杆顶部
+                screenX, screenY - 20, light.radius  // 标准光照范围
             );
 
-            // 中心完全擦除（显示原始画面），边缘逐渐恢复黑暗
-            lightGradient.addColorStop(0, 'rgba(255, 255, 255, 1)');     // 中心完全擦除
-            lightGradient.addColorStop(0.3, 'rgba(255, 255, 255, 0.9)'); // 近处大部分擦除
-            lightGradient.addColorStop(0.6, 'rgba(255, 255, 255, 0.5)'); // 中间半透明
-            lightGradient.addColorStop(0.9, 'rgba(255, 255, 255, 0.2)'); // 边缘轻微擦除
-            lightGradient.addColorStop(1, 'rgba(255, 255, 255, 0)');     // 最外围无擦除
+            // 极端硬边缘效果 - 完全模仿参考游戏
+            lightGradient.addColorStop(0, 'rgba(255, 255, 255, 1)');      // 中心100%清晰
+            lightGradient.addColorStop(0.7, 'rgba(255, 255, 255, 1)');    // 70%范围内完全清晰
+            lightGradient.addColorStop(0.75, 'rgba(255, 255, 255, 0.8)'); // 急剧衰减
+            lightGradient.addColorStop(0.8, 'rgba(255, 255, 255, 0.5)');  // 快速变暗
+            lightGradient.addColorStop(0.85, 'rgba(255, 255, 255, 0.2)'); // 很暗
+            lightGradient.addColorStop(0.9, 'rgba(255, 255, 255, 0.05)'); // 几乎全黑
+            lightGradient.addColorStop(1, 'rgba(255, 255, 255, 0)');      // 完全黑暗
 
             offCtx.fillStyle = lightGradient;
             offCtx.beginPath();
-            offCtx.arc(screenX, screenY + 20, light.radius, 0, Math.PI * 2);
+            offCtx.arc(screenX, screenY - 20, light.radius, 0, Math.PI * 2);  // 修正：光圈中心在灯杆顶部
             offCtx.fill();
         });
 
@@ -1646,30 +1648,30 @@ class GameWorld {
         ctx.drawImage(offCanvas, 0, 0);
         ctx.restore();
 
-        // 4. 添加非常微弱的暖色光晕（不过度）
-        ctx.save();
-        ctx.globalCompositeOperation = 'screen';
+        // 4. 移除灯泡光晕效果（暂时注释掉）
+        // ctx.save();
+        // ctx.globalCompositeOperation = 'screen';
 
-        this.lights.forEach(light => {
-            const screenX = light.x - this.camera.x;
-            const screenY = light.y - this.camera.y;
+        // this.lights.forEach(light => {
+        //     const screenX = light.x - this.camera.x;
+        //     const screenY = light.y - this.camera.y;
 
-            // 在灯光中心添加暖色光晕
-            const glowGradient = ctx.createRadialGradient(
-                screenX, screenY + 20, 0,
-                screenX, screenY + 20, light.radius * 0.6  // 扩大暖光范围
-            );
-            glowGradient.addColorStop(0, `rgba(255, 245, 200, ${0.15 * light.brightness})`);  // 增强中心暖光
-            glowGradient.addColorStop(0.5, `rgba(255, 240, 180, ${0.08 * light.brightness})`); // 添加中间层
-            glowGradient.addColorStop(1, 'rgba(255, 235, 160, 0)');
+        //     // 只有灯泡位置的小光晕
+        //     const bulbGlow = ctx.createRadialGradient(
+        //         screenX, screenY - 20, 0,
+        //         screenX, screenY - 20, 15
+        //     );
+        //     bulbGlow.addColorStop(0, `rgba(255, 255, 200, ${0.3 * light.brightness})`);
+        //     bulbGlow.addColorStop(0.5, `rgba(255, 250, 180, ${0.15 * light.brightness})`);
+        //     bulbGlow.addColorStop(1, 'rgba(255, 245, 160, 0)');
 
-            ctx.fillStyle = glowGradient;
-            ctx.beginPath();
-            ctx.arc(screenX, screenY + 20, light.radius * 0.6, 0, Math.PI * 2);  // 扩大绘制范围匹配渐变
-            ctx.fill();
-        });
+        //     ctx.fillStyle = bulbGlow;
+        //     ctx.beginPath();
+        //     ctx.arc(screenX, screenY - 20, 15, 0, Math.PI * 2);
+        //     ctx.fill();
+        // });
 
-        ctx.restore();
+        // ctx.restore();
     }
 
     drawVignette() {
