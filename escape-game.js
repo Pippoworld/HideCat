@@ -82,6 +82,39 @@ dogSprite.onload = () => {
     console.log('Each dog sprite:', dogSpriteWidth, 'x', dogSpriteHeight);
 };
 
+// 加载柴犬精灵图
+const shibaSprite = new Image();
+shibaSprite.src = 'shiba-sprite.png';
+let shibaSpriteLoaded = false;
+let shibaSpriteWidth = 0;
+let shibaSpriteHeight = 0;
+
+shibaSprite.onload = () => {
+    shibaSpriteLoaded = true;
+    // 柴犬精灵图包含4帧：1个跑步，2个走路，1个静止
+    // 图片不是标准网格，需要精准切割
+    console.log('Shiba sprite loaded:', shibaSprite.width, 'x', shibaSprite.height);
+
+    // 定义每一帧的精确位置和尺寸
+    // 格式: [x, y, width, height]
+    window.shibaFrames = [
+        // 第一帧：跑步
+        { x: 46, y: 0, width: 255, height: 230 },
+        // 第二帧：走路1
+        { x: 279, y: 0, width: 255, height: 244 },
+        // 第三帧：走路2（原来的静止）
+        { x: 267, y: 241, width: 255, height: 244 },
+        // 第四帧：静止（原来的走路2）
+        { x: 23, y: 244, width: 255, height: 244 }
+    ];
+
+    // 找出最大尺寸用于统一绘制
+    shibaSpriteWidth = Math.max(...window.shibaFrames.map(f => f.width));
+    shibaSpriteHeight = Math.max(...window.shibaFrames.map(f => f.height));
+
+    console.log('Shiba frames configured, max size:', shibaSpriteWidth, 'x', shibaSpriteHeight);
+};
+
 // 加载裂纹石板纹理
 const crackedStoneTexture = new Image();
 crackedStoneTexture.src = 'cracked-stone-texture.png'; // 使用正确的纹理图片
@@ -244,10 +277,10 @@ class Cat {
         let hitLamp = false;
         for (let light of lights) {
             // 路灯碰撞参数
-            const collisionRadius = 15;  // 碰撞半径（稍微小一点）
-            const collisionOffsetY = -40;  // 碰撞中心向上偏移（灯杆中部）
+            const collisionRadius = 20;  // 碰撞半径（稍微大一点以匹配新路灯）
+            const collisionOffsetY = -120;  // 碰撞中心向上偏移更多（因为新路灯图片更高）
 
-            // 碰撞中心点（在灯杆中部）
+            // 碰撞中心点（在路灯底座位置）
             const collisionX = light.x;
             const collisionY = light.y + collisionOffsetY;
 
@@ -549,21 +582,33 @@ class SafeLight {
             ctx.fill();
             ctx.restore();
 
-            // 只绘制灯杆和灯头部分（图片顶部约75%的部分 - 不包括石头底座）
+            // 分两部分绘制：先画灯杆（不带光晕），再画灯头（带光晕）
+
+            // 1. 绘制灯杆部分（中间部分，不包括灯头和底座）
+            ctx.drawImage(
+                lampSprite,
+                0, lampSprite.height * 0.25,  // 源图片：从25%位置开始（跳过灯头）
+                lampSprite.width, lampSprite.height * 0.42,  // 源图片：取42%高度（只有灯杆）
+                screenX - lampWidth / 2,
+                lampTopY + lampHeight * 0.25,  // 目标位置：对应的位置
+                lampWidth,
+                lampHeight * 0.42  // 目标大小：42%高度
+            );
+
+            // 2. 绘制灯头部分（带光晕效果）
             ctx.save();
-            // 灯泡发光效果 - 在灯的顶部添加光晕
             ctx.shadowColor = `rgba(255, 250, 180, ${this.brightness})`;
-            ctx.shadowBlur = 50;
-            ctx.shadowOffsetY = -10;
+            ctx.shadowBlur = 40;
+            ctx.shadowOffsetY = -5;
 
             ctx.drawImage(
                 lampSprite,
                 0, 0,  // 源图片：从顶部开始
-                lampSprite.width, lampSprite.height * 0.67,  // 源图片：取67%高度（不包括石头底座）
+                lampSprite.width, lampSprite.height * 0.25,  // 源图片：取25%高度（只有灯头）
                 screenX - lampWidth / 2,
-                lampTopY,  // 目标位置：正常位置
+                lampTopY,  // 目标位置：顶部位置
                 lampWidth,
-                lampHeight * 0.67  // 目标大小：67%高度
+                lampHeight * 0.25  // 目标大小：25%高度
             );
             ctx.restore();
         } else {
@@ -1048,6 +1093,314 @@ class WildDog {
     }
 }
 
+// 柴犬敌人（比野狗更友善但仍是障碍）
+class ShibaInu {
+    constructor(x, y) {
+        this.x = x;
+        this.y = y;
+        this.vx = 0;
+        this.vy = 0;
+        this.speed = 1.2;        // 巡逻速度（比野狗慢）
+        this.minChaseSpeed = 1.5;  // 追击起始速度（比野狗慢）
+        this.maxChaseSpeed = 2.5;  // 最高追击速度（比野狗慢）
+        this.currentChaseSpeed = this.minChaseSpeed;
+        this.acceleration = 0.005;  // 加速度（比野狗慢）
+        this.size = 65;  // 放大后的碰撞体积
+        this.detectionRadius = 150;  // 侦测范围比野狗小
+        this.territoryRadius = 200;  // 领地范围比野狗小
+        this.homeX = x;
+        this.homeY = y;
+        this.state = 'patrol'; // patrol, curious, playful
+        this.animationFrame = 0;
+        this.facing = 'right';
+        this.currentSprite = 0;
+        this.curiosityTimer = 0;
+        this.playfulJumpTimer = 0;
+        this.restTimer = 0;
+        this.patrolTarget = null;
+    }
+
+    update(cat, lights) {
+        // 检查猫是否在安全区
+        let catInSafeZone = false;
+        for (let light of lights) {
+            if (light.isInSafeZone(cat.x, cat.y)) {
+                catInSafeZone = true;
+                break;
+            }
+        }
+
+        const dx = cat.x - this.x;
+        const dy = cat.y - this.y;
+        const distanceToCat = Math.sqrt(dx * dx + dy * dy);
+
+        // 柴犬的行为模式
+        switch (this.state) {
+            case 'patrol':
+                // 悠闲巡逻 - 正常走路
+                if (!this.patrolTarget || this.restTimer > 0) {
+                    if (this.restTimer > 0) {
+                        this.restTimer--;
+                        this.vx *= 0.9; // 缓慢停下
+                        this.vy *= 0.9;
+
+                        if (this.restTimer === 0) {
+                            // 选择新目标
+                            const angle = Math.random() * Math.PI * 2;
+                            const distance = 100 + Math.random() * 150;
+                            this.patrolTarget = {
+                                x: this.homeX + Math.cos(angle) * distance,
+                                y: this.homeY + Math.sin(angle) * distance
+                            };
+                        }
+                    } else {
+                        // 初始目标
+                        const angle = Math.random() * Math.PI * 2;
+                        const distance = 100 + Math.random() * 150;
+                        this.patrolTarget = {
+                            x: this.homeX + Math.cos(angle) * distance,
+                            y: this.homeY + Math.sin(angle) * distance
+                        };
+                        this.restTimer = 0;
+                    }
+                } else {
+                    // 向目标走去
+                    const ptx = this.patrolTarget.x - this.x;
+                    const pty = this.patrolTarget.y - this.y;
+                    const ptDist = Math.sqrt(ptx * ptx + pty * pty);
+
+                    if (ptDist > 15) {
+                        // 正常走路速度
+                        this.vx = (ptx / ptDist) * this.speed * 0.6;
+                        this.vy = (pty / ptDist) * this.speed * 0.6;
+                    } else {
+                        // 到达目标，休息一会
+                        this.patrolTarget = null;
+                        this.restTimer = 60 + Math.random() * 120; // 1-3秒休息
+                    }
+                }
+
+                // 如果猫靠近，变成好奇状态
+                if (distanceToCat < this.detectionRadius && !catInSafeZone) {
+                    this.state = 'curious';
+                    this.curiosityTimer = 0;
+                    this.restTimer = 0;
+                    this.patrolTarget = null;
+                }
+                break;
+
+            case 'curious':
+                // 好奇地慢慢接近
+                this.curiosityTimer++;
+
+                if (distanceToCat > 80) {
+                    // 慢慢走向猫
+                    this.vx = (dx / distanceToCat) * this.speed * 0.8;
+                    this.vy = (dy / distanceToCat) * this.speed * 0.8;
+                } else if (distanceToCat > 50) {
+                    // 保持一定距离，慢慢绕圈观察
+                    const circleAngle = this.curiosityTimer * 0.02;
+                    const targetX = cat.x + Math.cos(circleAngle) * 70;
+                    const targetY = cat.y + Math.sin(circleAngle) * 70;
+
+                    const tdx = targetX - this.x;
+                    const tdy = targetY - this.y;
+                    const tdist = Math.sqrt(tdx * tdx + tdy * tdy);
+
+                    if (tdist > 5) {
+                        this.vx = (tdx / tdist) * this.speed * 0.5;
+                        this.vy = (tdy / tdist) * this.speed * 0.5;
+                    }
+                } else {
+                    // 太近了，后退一点
+                    this.vx = -(dx / distanceToCat) * this.speed * 0.3;
+                    this.vy = -(dy / distanceToCat) * this.speed * 0.3;
+                }
+
+                // 一段时间后进入玩耍状态
+                if (this.curiosityTimer > 200 && distanceToCat < 100) {
+                    this.state = 'playful';
+                    this.playfulJumpTimer = 0;
+                }
+
+                // 如果猫离开或进入安全区，回到巡逻
+                if (distanceToCat > this.detectionRadius * 1.5 || catInSafeZone) {
+                    this.state = 'patrol';
+                    this.patrolTarget = null;
+                    this.restTimer = 0;
+                }
+                break;
+
+            case 'playful':
+                // 玩耍状态 - 快速跑动
+                this.playfulJumpTimer++;
+
+                // 快速绕圈跑
+                const playAngle = this.playfulJumpTimer * 0.04;
+                const playRadius = 60 + Math.sin(this.playfulJumpTimer * 0.02) * 20;
+                const targetX = cat.x + Math.cos(playAngle) * playRadius;
+                const targetY = cat.y + Math.sin(playAngle) * playRadius;
+
+                const tdx = targetX - this.x;
+                const tdy = targetY - this.y;
+                const tdist = Math.sqrt(tdx * tdx + tdy * tdy);
+
+                if (tdist > 5) {
+                    // 玩耍时跑得快一点
+                    this.vx = (tdx / tdist) * this.speed * 1.8;
+                    this.vy = (tdy / tdist) * this.speed * 1.8;
+                }
+
+                // 玩耍一段时间后回到好奇状态
+                if (this.playfulJumpTimer > 180 || distanceToCat > 150) {
+                    this.state = 'curious';
+                    this.curiosityTimer = 0;
+                }
+                break;
+        }
+
+        // 平滑速度变化
+        this.x += this.vx;
+        this.y += this.vy;
+
+        // 速度衰减（让动作更平滑）
+        this.vx *= 0.98;
+        this.vy *= 0.98;
+
+        // 更新面向
+        if (Math.abs(this.vx) > 0.1) {
+            this.facing = this.vx > 0 ? 'right' : 'left';
+        }
+
+        // 根据速度和状态更新动画帧
+        const speed = Math.sqrt(this.vx * this.vx + this.vy * this.vy);
+
+        if (speed < 0.2) {
+            // 静止：使用第4帧（静止帧）
+            this.currentSprite = 3;
+            this.animationFrame = 0;
+        } else if (this.state === 'playful' || speed > this.speed * 1.2) {
+            // 快速跑动：使用第1帧（跑步帧）
+            this.currentSprite = 0;
+            // 跑步时可以有一些动画效果
+            this.animationFrame = (this.animationFrame + 2) % 20;
+        } else {
+            // 正常走路：交替使用第2、3帧（走路帧）
+            this.animationFrame += speed / this.speed * 2;
+            if (this.animationFrame >= 30) {
+                this.animationFrame = 0;
+            }
+            // 在两个走路帧之间切换（1和2对应索引1和2）
+            this.currentSprite = (Math.floor(this.animationFrame / 15) % 2) + 1;
+        }
+
+        // 与猫的碰撞检测（只造成轻微伤害）
+        if (distanceToCat < this.size + 25) {
+            const knockbackForce = 2;
+            const knockbackX = -(dx / distanceToCat) * knockbackForce;
+            const knockbackY = -(dy / distanceToCat) * knockbackForce;
+            return {
+                damage: 0.2,  // 很小的伤害
+                knockbackX,
+                knockbackY
+            };
+        }
+
+        return null;
+    }
+
+    draw(ctx, camera) {
+        const screenX = this.x - camera.x;
+        const screenY = this.y - camera.y;
+
+        // 绘制柴犬精灵
+        if (shibaSpriteLoaded && window.shibaFrames && window.shibaFrames.length > 0) {
+            ctx.save();
+
+            // 获取当前帧的信息
+            const frame = window.shibaFrames[this.currentSprite] || window.shibaFrames[0];
+
+            // 保持原始比例并放大
+            const drawScale = 3.0;  // 放大三倍
+            const aspectRatio = frame.width / frame.height;  // 保持原始宽高比
+            const drawHeight = 150;  // 基础高度放大三倍
+            const drawWidth = drawHeight * aspectRatio;  // 根据比例计算宽度
+
+            // 如果面向右边，翻转图像（假设原图是朝左的）
+            if (this.facing === 'right') {
+                ctx.translate(screenX, screenY);
+                ctx.scale(-1, 1);
+                ctx.translate(-screenX, -screenY);
+            }
+
+            // 绘制柴犬精灵，从精确的位置切割
+            ctx.drawImage(
+                shibaSprite,
+                frame.x,        // 源图片X
+                frame.y,        // 源图片Y
+                frame.width,    // 源图片宽度
+                frame.height,   // 源图片高度
+                screenX - drawWidth / 2,   // 目标X（居中）
+                screenY - drawHeight / 2,  // 目标Y（居中）
+                drawWidth,      // 目标宽度
+                drawHeight      // 目标高度
+            );
+
+            ctx.restore();
+
+            // 玩耍状态显示特效
+            if (this.state === 'playful') {
+                ctx.save();
+                ctx.strokeStyle = 'rgba(255, 200, 100, 0.5)';
+                ctx.lineWidth = 2;
+                ctx.setLineDash([5, 5]);
+                ctx.beginPath();
+                ctx.arc(screenX, screenY, 40, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.restore();
+            }
+        } else {
+            // 备用绘制（放大两倍）
+            ctx.fillStyle = '#c4834f';  // 柴犬颜色
+            ctx.beginPath();
+            ctx.arc(screenX, screenY, this.size, 0, Math.PI * 2);
+            ctx.fill();
+
+            // 眼睛
+            ctx.fillStyle = '#000';
+            const eyeOffset = this.facing === 'right' ? 20 : -20;
+            ctx.beginPath();
+            ctx.arc(screenX + eyeOffset, screenY - 10, 6, 0, Math.PI * 2);
+            ctx.fill();
+
+            // 尾巴
+            ctx.strokeStyle = '#c4834f';
+            ctx.lineWidth = 16;
+            ctx.beginPath();
+            const tailDir = this.facing === 'right' ? -1 : 1;
+            ctx.moveTo(screenX + tailDir * this.size, screenY);
+            ctx.quadraticCurveTo(
+                screenX + tailDir * (this.size + 30),
+                screenY - 40,
+                screenX + tailDir * (this.size + 20),
+                screenY - 60
+            );
+            ctx.stroke();
+        }
+
+        // 显示状态图标
+        if (this.state === 'curious') {
+            ctx.fillStyle = '#ffff00';
+            ctx.font = '20px Arial';
+            ctx.fillText('?', screenX - 5, screenY - this.size - 10);
+        } else if (this.state === 'playful') {
+            ctx.fillStyle = '#ff69b4';
+            ctx.font = '20px Arial';
+            ctx.fillText('♪', screenX - 5, screenY - this.size - 10);
+        }
+    }
+}
+
 // 出口
 class Exit {
     constructor(x, y) {
@@ -1115,6 +1468,7 @@ class GameWorld {
         this.cat = new Cat(200, 200);
         this.lights = [];
         this.dogs = [];
+        this.shibas = [];  // 柴犬列表
         this.exit = null;
         this.particles = [];
         this.obstacles = [];
@@ -1133,6 +1487,10 @@ class GameWorld {
         // 小地图显示状态
         this.minimapVisible = false;
         this.minimapElement = document.querySelector('.minimap');
+
+        // 光照方案切换（用于测试）
+        this.lightingScheme = 1;  // 默认方案1
+        this.lightingSchemeName = '原始方案';
 
         this.init();
     }
@@ -1161,6 +1519,37 @@ class GameWorld {
 
             if (validPosition) {
                 this.dogs.push(new WildDog(x, y));
+            } else {
+                i--; // 重新生成
+            }
+        }
+
+        // 生成柴犬（比野狗少，更友善）
+        for (let i = 0; i < 8; i++) {
+            const x = Math.random() * (WORLD_WIDTH - 400) + 200;
+            const y = Math.random() * (WORLD_HEIGHT - 400) + 200;
+
+            // 确保柴犬不在灯光范围内生成
+            let validPosition = true;
+            for (let light of this.lights) {
+                if (light.isInSafeZone(x, y)) {
+                    validPosition = false;
+                    break;
+                }
+            }
+
+            // 也要确保不要和野狗太近
+            for (let dog of this.dogs) {
+                const dx = dog.x - x;
+                const dy = dog.y - y;
+                if (Math.sqrt(dx * dx + dy * dy) < 150) {
+                    validPosition = false;
+                    break;
+                }
+            }
+
+            if (validPosition) {
+                this.shibas.push(new ShibaInu(x, y));
             } else {
                 i--; // 重新生成
             }
@@ -1212,6 +1601,17 @@ class GameWorld {
 
         // 更新野狗
         this.dogs.forEach(dog => dog.update(this.cat, this.lights));
+
+        // 更新柴犬
+        this.shibas.forEach(shiba => {
+            const result = shiba.update(this.cat, this.lights);
+            // 处理柴犬造成的伤害（很小）
+            if (result) {
+                this.cat.takeDamage(result.damage);
+                this.cat.vx += result.knockbackX;
+                this.cat.vy += result.knockbackY;
+            }
+        });
 
         // 更新出口
         this.exit.update();
@@ -1267,6 +1667,16 @@ class GameWorld {
             });
         });
 
+        // 添加柴犬
+        this.shibas.forEach(shiba => {
+            renderables.push({
+                y: shiba.y,
+                type: 'shiba',
+                obj: shiba,
+                draw: () => shiba.draw(ctx, this.camera)
+            });
+        });
+
         // 添加猫
         renderables.push({
             y: this.cat.y,
@@ -1304,6 +1714,18 @@ class GameWorld {
 
         // 绘制夜晚黑暗遮罩和光照效果
         this.drawDarknessWithLights();
+
+        // 重新绘制灯光（在黑暗遮罩之上，确保灯杆和灯罩清晰可见）
+        this.lights.forEach(light => {
+            const screenX = light.x - this.camera.x;
+            const screenY = light.y - this.camera.y;
+
+            // 只绘制可见范围内的灯
+            if (screenX > -150 && screenX < VIEWPORT_WIDTH + 150 &&
+                screenY > -150 && screenY < VIEWPORT_HEIGHT + 150) {
+                light.drawPole(ctx, this.camera);
+            }
+        });
 
         // 绘制暗角效果
         this.drawVignette();
@@ -1603,7 +2025,50 @@ class GameWorld {
         });
     }
 
+    // 显示当前光照方案
+    showLightingSchemeInfo() {
+        ctx.save();
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+        ctx.fillRect(10, 200, 250, 30);
+        ctx.fillStyle = '#fff';
+        ctx.font = '14px Arial';
+        ctx.fillText(`光照方案 ${this.lightingScheme}: ${this.lightingSchemeName}`, 20, 220);
+        ctx.restore();
+    }
+
     drawDarknessWithLights() {
+        // 根据当前选择的方案调用对应的光照函数
+        switch(this.lightingScheme) {
+            case 1:
+                this.drawLightingScheme1();
+                break;
+            case 2:
+                this.drawLightingScheme2();
+                break;
+            case 3:
+                this.drawLightingScheme3();
+                break;
+            case 4:
+                this.drawLightingScheme4();
+                break;
+            case 5:
+                this.drawLightingScheme5();
+                break;
+            case 6:
+                this.drawLightingScheme6();
+                break;
+            default:
+                this.drawLightingScheme1();
+        }
+
+        // 显示当前方案信息
+        this.showLightingSchemeInfo();
+    }
+
+    // 方案1：原始方案（当前的实现）
+    drawLightingScheme1() {
+        this.lightingSchemeName = '原始方案';
+
         // 创建离屏canvas用于处理光照遮罩
         const offCanvas = document.createElement('canvas');
         offCanvas.width = VIEWPORT_WIDTH;
@@ -1649,7 +2114,34 @@ class GameWorld {
         ctx.drawImage(offCanvas, 0, 0);
         ctx.restore();
 
-        // 4. 移除灯泡光晕效果（暂时注释掉）
+        // 4. 添加灯杆和灯泡的发光效果
+        ctx.save();
+
+        this.lights.forEach(light => {
+            const screenX = light.x - this.camera.x;
+            const screenY = light.y - this.camera.y;
+
+            // 灯泡发光效果（更亮的光晕）
+            ctx.globalCompositeOperation = 'screen';
+            const bulbGlow = ctx.createRadialGradient(
+                screenX, screenY - 100, 0,
+                screenX, screenY - 100, 30
+            );
+            bulbGlow.addColorStop(0, `rgba(255, 255, 240, ${0.6 * light.brightness})`);
+            bulbGlow.addColorStop(0.4, `rgba(255, 250, 230, ${0.4 * light.brightness})`);
+            bulbGlow.addColorStop(0.7, `rgba(255, 245, 210, ${0.2 * light.brightness})`);
+            bulbGlow.addColorStop(1, 'rgba(255, 240, 200, 0)');
+
+            ctx.fillStyle = bulbGlow;
+            ctx.beginPath();
+            ctx.arc(screenX, screenY - 100, 30, 0, Math.PI * 2);
+            ctx.fill();
+
+        });
+
+        ctx.restore();
+
+        // 5. 原注释部分（保持不动）
         // ctx.save();
         // ctx.globalCompositeOperation = 'screen';
 
@@ -1673,6 +2165,265 @@ class GameWorld {
         // });
 
         // ctx.restore();
+    }
+
+    // 方案2：双光源系统（灯泡光晕 + 地面光圈）
+    drawLightingScheme2() {
+        this.lightingSchemeName = '双光源系统';
+
+        const offCanvas = document.createElement('canvas');
+        offCanvas.width = VIEWPORT_WIDTH;
+        offCanvas.height = VIEWPORT_HEIGHT;
+        const offCtx = offCanvas.getContext('2d');
+
+        offCtx.fillStyle = 'rgba(0, 0, 0, 0.65)';
+        offCtx.fillRect(0, 0, VIEWPORT_WIDTH, VIEWPORT_HEIGHT);
+        offCtx.globalCompositeOperation = 'destination-out';
+
+        this.lights.forEach(light => {
+            const screenX = light.x - this.camera.x;
+            const screenY = light.y - this.camera.y;
+
+            // 灯泡光晕（小而亮）
+            const bulbGradient = offCtx.createRadialGradient(
+                screenX, screenY - 100, 0,
+                screenX, screenY - 100, 50
+            );
+            bulbGradient.addColorStop(0, 'rgba(255, 255, 255, 1)');
+            bulbGradient.addColorStop(0.5, 'rgba(255, 255, 255, 0.8)');
+            bulbGradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+
+            offCtx.fillStyle = bulbGradient;
+            offCtx.beginPath();
+            offCtx.arc(screenX, screenY - 100, 50, 0, Math.PI * 2);
+            offCtx.fill();
+
+            // 地面光圈（大而柔和）
+            const groundGradient = offCtx.createRadialGradient(
+                screenX, screenY + 20, 0,
+                screenX, screenY + 20, light.radius
+            );
+            groundGradient.addColorStop(0, 'rgba(255, 255, 255, 0.9)');
+            groundGradient.addColorStop(0.5, 'rgba(255, 255, 255, 0.7)');
+            groundGradient.addColorStop(0.8, 'rgba(255, 255, 255, 0.3)');
+            groundGradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+
+            offCtx.fillStyle = groundGradient;
+            offCtx.beginPath();
+            offCtx.arc(screenX, screenY + 20, light.radius, 0, Math.PI * 2);
+            offCtx.fill();
+        });
+
+        ctx.save();
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.drawImage(offCanvas, 0, 0);
+        ctx.restore();
+    }
+
+    // 方案3：椭圆形光照
+    drawLightingScheme3() {
+        this.lightingSchemeName = '椭圆形光照';
+
+        const offCanvas = document.createElement('canvas');
+        offCanvas.width = VIEWPORT_WIDTH;
+        offCanvas.height = VIEWPORT_HEIGHT;
+        const offCtx = offCanvas.getContext('2d');
+
+        offCtx.fillStyle = 'rgba(0, 0, 0, 0.65)';
+        offCtx.fillRect(0, 0, VIEWPORT_WIDTH, VIEWPORT_HEIGHT);
+        offCtx.globalCompositeOperation = 'destination-out';
+
+        this.lights.forEach(light => {
+            const screenX = light.x - this.camera.x;
+            const screenY = light.y - this.camera.y;
+
+            // 垂直椭圆形光照
+            offCtx.save();
+            offCtx.translate(screenX, screenY - 40);
+            offCtx.scale(1, 1.5);  // 垂直拉伸
+
+            const ellipseGradient = offCtx.createRadialGradient(
+                0, 0, 0,
+                0, 0, light.radius * 0.8
+            );
+            ellipseGradient.addColorStop(0, 'rgba(255, 255, 255, 1)');
+            ellipseGradient.addColorStop(0.5, 'rgba(255, 255, 255, 0.8)');
+            ellipseGradient.addColorStop(0.8, 'rgba(255, 255, 255, 0.4)');
+            ellipseGradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+
+            offCtx.fillStyle = ellipseGradient;
+            offCtx.beginPath();
+            offCtx.arc(0, 0, light.radius * 0.8, 0, Math.PI * 2);
+            offCtx.fill();
+            offCtx.restore();
+        });
+
+        ctx.save();
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.drawImage(offCanvas, 0, 0);
+        ctx.restore();
+    }
+
+    // 方案4：多层光照叠加
+    drawLightingScheme4() {
+        this.lightingSchemeName = '多层光照叠加';
+
+        const offCanvas = document.createElement('canvas');
+        offCanvas.width = VIEWPORT_WIDTH;
+        offCanvas.height = VIEWPORT_HEIGHT;
+        const offCtx = offCanvas.getContext('2d');
+
+        offCtx.fillStyle = 'rgba(0, 0, 0, 0.65)';
+        offCtx.fillRect(0, 0, VIEWPORT_WIDTH, VIEWPORT_HEIGHT);
+        offCtx.globalCompositeOperation = 'destination-out';
+
+        this.lights.forEach(light => {
+            const screenX = light.x - this.camera.x;
+            const screenY = light.y - this.camera.y;
+
+            // 第1层：灯泡光晕（小，很亮）
+            const bulbGradient = offCtx.createRadialGradient(
+                screenX, screenY - 100, 0,
+                screenX, screenY - 100, 40
+            );
+            bulbGradient.addColorStop(0, 'rgba(255, 255, 255, 1)');
+            bulbGradient.addColorStop(0.6, 'rgba(255, 255, 255, 0.9)');
+            bulbGradient.addColorStop(1, 'rgba(255, 255, 255, 0.3)');
+
+            offCtx.fillStyle = bulbGradient;
+            offCtx.beginPath();
+            offCtx.arc(screenX, screenY - 100, 40, 0, Math.PI * 2);
+            offCtx.fill();
+
+            // 第2层：中间过渡光
+            const middleGradient = offCtx.createRadialGradient(
+                screenX, screenY - 40, 0,
+                screenX, screenY - 40, 120
+            );
+            middleGradient.addColorStop(0, 'rgba(255, 255, 255, 0.8)');
+            middleGradient.addColorStop(0.5, 'rgba(255, 255, 255, 0.6)');
+            middleGradient.addColorStop(1, 'rgba(255, 255, 255, 0.2)');
+
+            offCtx.fillStyle = middleGradient;
+            offCtx.beginPath();
+            offCtx.arc(screenX, screenY - 40, 120, 0, Math.PI * 2);
+            offCtx.fill();
+
+            // 第3层：地面光圈（大，正常亮度）
+            const groundGradient = offCtx.createRadialGradient(
+                screenX, screenY + 20, 0,
+                screenX, screenY + 20, light.radius
+            );
+            groundGradient.addColorStop(0, 'rgba(255, 255, 255, 0.9)');
+            groundGradient.addColorStop(0.6, 'rgba(255, 255, 255, 0.7)');
+            groundGradient.addColorStop(0.85, 'rgba(255, 255, 255, 0.3)');
+            groundGradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+
+            offCtx.fillStyle = groundGradient;
+            offCtx.beginPath();
+            offCtx.arc(screenX, screenY + 20, light.radius, 0, Math.PI * 2);
+            offCtx.fill();
+        });
+
+        ctx.save();
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.drawImage(offCanvas, 0, 0);
+        ctx.restore();
+    }
+
+    // 方案5：光照强度衰减
+    drawLightingScheme5() {
+        this.lightingSchemeName = '光照强度衰减';
+
+        const offCanvas = document.createElement('canvas');
+        offCanvas.width = VIEWPORT_WIDTH;
+        offCanvas.height = VIEWPORT_HEIGHT;
+        const offCtx = offCanvas.getContext('2d');
+
+        offCtx.fillStyle = 'rgba(0, 0, 0, 0.65)';
+        offCtx.fillRect(0, 0, VIEWPORT_WIDTH, VIEWPORT_HEIGHT);
+        offCtx.globalCompositeOperation = 'destination-out';
+
+        this.lights.forEach(light => {
+            const screenX = light.x - this.camera.x;
+            const screenY = light.y - this.camera.y;
+
+            // 从上到下的多个光圈，强度逐渐变化
+            const positions = [
+                { y: -100, radius: 40, intensity: 1.0 },    // 灯泡处
+                { y: -60, radius: 70, intensity: 0.85 },    // 上部
+                { y: -20, radius: 100, intensity: 0.7 },    // 中部
+                { y: 20, radius: 150, intensity: 0.8 },     // 下部
+                { y: 40, radius: 200, intensity: 0.6 }      // 地面
+            ];
+
+            positions.forEach(pos => {
+                const gradient = offCtx.createRadialGradient(
+                    screenX, screenY + pos.y, 0,
+                    screenX, screenY + pos.y, pos.radius
+                );
+                gradient.addColorStop(0, `rgba(255, 255, 255, ${pos.intensity})`);
+                gradient.addColorStop(0.5, `rgba(255, 255, 255, ${pos.intensity * 0.7})`);
+                gradient.addColorStop(0.8, `rgba(255, 255, 255, ${pos.intensity * 0.3})`);
+                gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+
+                offCtx.fillStyle = gradient;
+                offCtx.beginPath();
+                offCtx.arc(screenX, screenY + pos.y, pos.radius, 0, Math.PI * 2);
+                offCtx.fill();
+            });
+        });
+
+        ctx.save();
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.drawImage(offCanvas, 0, 0);
+        ctx.restore();
+    }
+
+    // 方案6：渐变光柱（锥形）
+    drawLightingScheme6() {
+        this.lightingSchemeName = '渐变光柱';
+
+        const offCanvas = document.createElement('canvas');
+        offCanvas.width = VIEWPORT_WIDTH;
+        offCanvas.height = VIEWPORT_HEIGHT;
+        const offCtx = offCanvas.getContext('2d');
+
+        offCtx.fillStyle = 'rgba(0, 0, 0, 0.65)';
+        offCtx.fillRect(0, 0, VIEWPORT_WIDTH, VIEWPORT_HEIGHT);
+        offCtx.globalCompositeOperation = 'destination-out';
+
+        this.lights.forEach(light => {
+            const screenX = light.x - this.camera.x;
+            const screenY = light.y - this.camera.y;
+
+            // 绘制多个圆形模拟光柱效果
+            for (let i = 0; i <= 20; i++) {
+                const t = i / 20;  // 0 到 1
+                const y = -100 + t * 140;  // 从灯泡到地面
+                const radius = 30 + t * (light.radius - 30);  // 逐渐扩大
+                const intensity = 1 - t * 0.2;  // 逐渐减弱
+
+                const gradient = offCtx.createRadialGradient(
+                    screenX, screenY + y, 0,
+                    screenX, screenY + y, radius
+                );
+                gradient.addColorStop(0, `rgba(255, 255, 255, ${intensity})`);
+                gradient.addColorStop(0.6, `rgba(255, 255, 255, ${intensity * 0.8})`);
+                gradient.addColorStop(0.9, `rgba(255, 255, 255, ${intensity * 0.3})`);
+                gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+
+                offCtx.fillStyle = gradient;
+                offCtx.beginPath();
+                offCtx.arc(screenX, screenY + y, radius, 0, Math.PI * 2);
+                offCtx.fill();
+            }
+        });
+
+        ctx.save();
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.drawImage(offCanvas, 0, 0);
+        ctx.restore();
     }
 
     drawVignette() {
@@ -1823,6 +2574,15 @@ class GameWorld {
         if (e.code === 'KeyM') {
             e.preventDefault();
             this.toggleMinimap();
+            return;
+        }
+
+        // 数字键1-6切换光照方案
+        if (e.code >= 'Digit1' && e.code <= 'Digit6') {
+            e.preventDefault();
+            const schemeNumber = parseInt(e.code.charAt(5));
+            this.lightingScheme = schemeNumber;
+            console.log(`切换到光照方案 ${schemeNumber}`);
             return;
         }
 

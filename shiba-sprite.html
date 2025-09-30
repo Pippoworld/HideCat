@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Shiba Sprite Placeholder</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            background: #f0f0f0;
+        }
+        canvas {
+            border: 1px solid #ccc;
+            background: white;
+        }
+    </style>
+</head>
+<body>
+    <h1>Shiba Sprite Sheet Generator</h1>
+    <p>This creates a placeholder shiba sprite until the actual image is properly saved.</p>
+    <canvas id="canvas" width="400" height="400"></canvas>
+    <br><br>
+    <button onclick="downloadImage()">Download as shiba-sprite.png</button>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+
+        // Create 2x2 grid of shiba frames
+        function drawShiba(x, y, frame) {
+            // Body (black)
+            ctx.fillStyle = '#1a1a1a';
+            ctx.beginPath();
+            ctx.ellipse(x + 100, y + 120, 45, 35, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Chest/belly (tan)
+            ctx.fillStyle = '#d4a574';
+            ctx.beginPath();
+            ctx.ellipse(x + 120, y + 125, 25, 30, 0.3, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Head (black)
+            ctx.fillStyle = '#1a1a1a';
+            ctx.beginPath();
+            ctx.arc(x + 140, y + 100, 25, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Snout (tan)
+            ctx.fillStyle = '#d4a574';
+            ctx.beginPath();
+            ctx.ellipse(x + 155, y + 105, 15, 12, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Ears (black with tan inside)
+            ctx.fillStyle = '#1a1a1a';
+            ctx.beginPath();
+            ctx.moveTo(x + 125, y + 85);
+            ctx.lineTo(x + 120, y + 70);
+            ctx.lineTo(x + 130, y + 75);
+            ctx.closePath();
+            ctx.fill();
+
+            ctx.beginPath();
+            ctx.moveTo(x + 140, y + 80);
+            ctx.lineTo(x + 135, y + 65);
+            ctx.lineTo(x + 145, y + 70);
+            ctx.closePath();
+            ctx.fill();
+
+            // Legs animation (different positions for each frame)
+            const legOffset = frame * 5;
+            ctx.strokeStyle = '#1a1a1a';
+            ctx.lineWidth = 12;
+
+            // Front legs
+            ctx.beginPath();
+            ctx.moveTo(x + 85, y + 140);
+            ctx.lineTo(x + 85 - legOffset, y + 170);
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.moveTo(x + 105, y + 140);
+            ctx.lineTo(x + 105 + legOffset, y + 170);
+            ctx.stroke();
+
+            // Back legs
+            ctx.beginPath();
+            ctx.moveTo(x + 65, y + 135);
+            ctx.lineTo(x + 65 + legOffset, y + 170);
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.moveTo(x + 125, y + 135);
+            ctx.lineTo(x + 125 - legOffset, y + 170);
+            ctx.stroke();
+
+            // Paws (tan)
+            ctx.fillStyle = '#d4a574';
+            ctx.beginPath();
+            ctx.arc(x + 85 - legOffset, y + 170, 6, 0, Math.PI * 2);
+            ctx.arc(x + 105 + legOffset, y + 170, 6, 0, Math.PI * 2);
+            ctx.arc(x + 65 + legOffset, y + 170, 6, 0, Math.PI * 2);
+            ctx.arc(x + 125 - legOffset, y + 170, 6, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Curled tail
+            ctx.strokeStyle = '#1a1a1a';
+            ctx.lineWidth = 15;
+            ctx.beginPath();
+            ctx.moveTo(x + 55, y + 115);
+            ctx.quadraticCurveTo(x + 30, y + 90, x + 40, y + 70);
+            ctx.stroke();
+
+            // Tail tip (tan)
+            ctx.fillStyle = '#d4a574';
+            ctx.beginPath();
+            ctx.arc(x + 40, y + 70, 8, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Eye
+            ctx.fillStyle = '#fff';
+            ctx.beginPath();
+            ctx.arc(x + 145, y + 95, 4, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = '#000';
+            ctx.beginPath();
+            ctx.arc(x + 146, y + 95, 2, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        // Draw 4 frames in 2x2 grid
+        drawShiba(0, 0, 0);      // Top-left
+        drawShiba(200, 0, 1);    // Top-right
+        drawShiba(0, 200, 2);    // Bottom-left
+        drawShiba(200, 200, 3);  // Bottom-right
+
+        function downloadImage() {
+            const link = document.createElement('a');
+            link.download = 'shiba-sprite.png';
+            link.href = canvas.toDataURL();
+            link.click();
+        }
+    </script>
+</body>
+</html>

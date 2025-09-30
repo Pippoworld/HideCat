@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>柴犬精灵帧测试</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            background: #333;
+            color: white;
+            font-family: Arial;
+        }
+        .container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+        .frame-box {
+            border: 2px solid #666;
+            padding: 10px;
+            background: #222;
+        }
+        canvas {
+            border: 1px solid #999;
+            background: white;
+            display: block;
+        }
+        .controls {
+            margin-top: 10px;
+        }
+        input {
+            width: 60px;
+            margin: 0 5px;
+        }
+        #sourceCanvas {
+            border: 2px solid yellow;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h1>柴犬精灵帧切割调试工具</h1>
+
+    <div>
+        <h2>原图（带网格线）</h2>
+        <canvas id="sourceCanvas"></canvas>
+    </div>
+
+    <h2>精灵帧预览</h2>
+    <div class="container">
+        <div class="frame-box">
+            <h3>帧1 - 跑步</h3>
+            <canvas id="frame0" width="100" height="100"></canvas>
+            <div class="controls">
+                X: <input type="number" id="x0" value="0">
+                Y: <input type="number" id="y0" value="0"><br>
+                W: <input type="number" id="w0" value="200">
+                H: <input type="number" id="h0" value="200">
+            </div>
+        </div>
+
+        <div class="frame-box">
+            <h3>帧2 - 走路1</h3>
+            <canvas id="frame1" width="100" height="100"></canvas>
+            <div class="controls">
+                X: <input type="number" id="x1" value="200">
+                Y: <input type="number" id="y1" value="0"><br>
+                W: <input type="number" id="w1" value="200">
+                H: <input type="number" id="h1" value="200">
+            </div>
+        </div>
+
+        <div class="frame-box">
+            <h3>帧3 - 走路2</h3>
+            <canvas id="frame2" width="100" height="100"></canvas>
+            <div class="controls">
+                X: <input type="number" id="x2" value="0">
+                Y: <input type="number" id="y2" value="200"><br>
+                W: <input type="number" id="w2" value="200">
+                H: <input type="number" id="h2" value="200">
+            </div>
+        </div>
+
+        <div class="frame-box">
+            <h3>帧4 - 静止</h3>
+            <canvas id="frame3" width="100" height="100"></canvas>
+            <div class="controls">
+                X: <input type="number" id="x3" value="200">
+                Y: <input type="number" id="y3" value="200"><br>
+                W: <input type="number" id="w3" value="200">
+                H: <input type="number" id="h3" value="200">
+            </div>
+        </div>
+    </div>
+
+    <button onclick="updateFrames()">更新预览</button>
+    <button onclick="generateCode()">生成代码</button>
+
+    <div id="codeOutput" style="margin-top: 20px; background: #111; padding: 10px; font-family: monospace; white-space: pre;"></div>
+
+    <script>
+        const img = new Image();
+        img.src = 'shiba-sprite.png';
+
+        img.onload = () => {
+            // 显示原图和网格
+            const sourceCanvas = document.getElementById('sourceCanvas');
+            sourceCanvas.width = img.width;
+            sourceCanvas.height = img.height;
+            const sCtx = sourceCanvas.getContext('2d');
+
+            // 绘制图片
+            sCtx.drawImage(img, 0, 0);
+
+            // 绘制网格线
+            sCtx.strokeStyle = 'rgba(255, 0, 0, 0.3)';
+            sCtx.lineWidth = 1;
+
+            // 2x2网格
+            sCtx.beginPath();
+            sCtx.moveTo(img.width / 2, 0);
+            sCtx.lineTo(img.width / 2, img.height);
+            sCtx.moveTo(0, img.height / 2);
+            sCtx.lineTo(img.width, img.height / 2);
+            sCtx.stroke();
+
+            // 初始化输入框
+            document.getElementById('w0').value = Math.floor(img.width / 2);
+            document.getElementById('h0').value = Math.floor(img.height / 2);
+            document.getElementById('x1').value = Math.floor(img.width / 2);
+            document.getElementById('w1').value = Math.floor(img.width / 2);
+            document.getElementById('h1').value = Math.floor(img.height / 2);
+            document.getElementById('y2').value = Math.floor(img.height / 2);
+            document.getElementById('w2').value = Math.floor(img.width / 2);
+            document.getElementById('h2').value = Math.floor(img.height / 2);
+            document.getElementById('x3').value = Math.floor(img.width / 2);
+            document.getElementById('y3').value = Math.floor(img.height / 2);
+            document.getElementById('w3').value = Math.floor(img.width / 2);
+            document.getElementById('h3').value = Math.floor(img.height / 2);
+
+            updateFrames();
+        };
+
+        function updateFrames() {
+            if (!img.complete) return;
+
+            for (let i = 0; i < 4; i++) {
+                const canvas = document.getElementById(`frame${i}`);
+                const ctx = canvas.getContext('2d');
+
+                const x = parseInt(document.getElementById(`x${i}`).value) || 0;
+                const y = parseInt(document.getElementById(`y${i}`).value) || 0;
+                const w = parseInt(document.getElementById(`w${i}`).value) || 100;
+                const h = parseInt(document.getElementById(`h${i}`).value) || 100;
+
+                ctx.clearRect(0, 0, 100, 100);
+                ctx.drawImage(img, x, y, w, h, 0, 0, 100, 100);
+
+                // 在原图上显示切割区域
+                const sCtx = document.getElementById('sourceCanvas').getContext('2d');
+                sCtx.drawImage(img, 0, 0); // 重绘原图
+
+                // 绘制网格
+                sCtx.strokeStyle = 'rgba(255, 0, 0, 0.3)';
+                sCtx.lineWidth = 1;
+                sCtx.beginPath();
+                sCtx.moveTo(img.width / 2, 0);
+                sCtx.lineTo(img.width / 2, img.height);
+                sCtx.moveTo(0, img.height / 2);
+                sCtx.lineTo(img.width, img.height / 2);
+                sCtx.stroke();
+            }
+
+            // 绘制当前切割区域
+            for (let i = 0; i < 4; i++) {
+                const x = parseInt(document.getElementById(`x${i}`).value) || 0;
+                const y = parseInt(document.getElementById(`y${i}`).value) || 0;
+                const w = parseInt(document.getElementById(`w${i}`).value) || 100;
+                const h = parseInt(document.getElementById(`h${i}`).value) || 100;
+
+                const sCtx = document.getElementById('sourceCanvas').getContext('2d');
+                sCtx.strokeStyle = ['red', 'green', 'blue', 'yellow'][i];
+                sCtx.lineWidth = 2;
+                sCtx.strokeRect(x, y, w, h);
+            }
+        }
+
+        function generateCode() {
+            const frames = [];
+            for (let i = 0; i < 4; i++) {
+                const x = parseInt(document.getElementById(`x${i}`).value) || 0;
+                const y = parseInt(document.getElementById(`y${i}`).value) || 0;
+                const w = parseInt(document.getElementById(`w${i}`).value) || 100;
+                const h = parseInt(document.getElementById(`h${i}`).value) || 100;
+                frames.push(`        { x: ${x}, y: ${y}, width: ${w}, height: ${h} }`);
+            }
+
+            const code = `window.shibaFrames = [
+    // 第一帧：跑步
+${frames[0]},
+    // 第二帧：走路1
+${frames[1]},
+    // 第三帧：走路2
+${frames[2]},
+    // 第四帧：静止
+${frames[3]}
+];`;
+
+            document.getElementById('codeOutput').textContent = code;
+        }
+
+        // 自动更新
+        document.querySelectorAll('input').forEach(input => {
+            input.addEventListener('input', updateFrames);
+        });
+    </script>
+</body>
+</html>
