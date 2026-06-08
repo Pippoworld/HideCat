@@ -1060,19 +1060,24 @@
 
     spawnBoss(wave) {
       const def = ENEMY_TYPES.boss;
+      const kinds = ['charger', 'artillery', 'summoner'];
+      const kind = kinds[(wave - 1) % kinds.length];
+      const colors = { charger: '#ff2bd6', artillery: '#ff7a3c', summoner: '#9b5cff' };
       const ang = rand(0, TAU);
       const d = Math.max(this.W, this.H) * 0.6;
       const hpScale = 1 + wave * 0.6 + this.time * 0.01;
       this.enemies.push({
         id: this._eid = (this._eid || 0) + 1,
-        type: 'boss', x: this.player.x + Math.cos(ang) * d, y: this.player.y + Math.sin(ang) * d,
+        type: 'boss', bossKind: kind, x: this.player.x + Math.cos(ang) * d, y: this.player.y + Math.sin(ang) * d,
         hp: def.hp * hpScale, maxHp: def.hp * hpScale, speed: def.speed,
-        r: def.r, dmg: def.dmg, xp: def.xp, color: def.color, shape: def.shape,
+        r: def.r, dmg: def.dmg, xp: def.xp, color: colors[kind], shape: def.shape,
         coin: def.coin * (1 + wave), boss: true, flash: 0, ang: 0, hitCd: 0, knockX: 0, knockY: 0,
+        bossT: 0, shootCd: 2.5, summonCd: 3,
       });
       this.shake(14);
       Sound.boss();
-      this.banner('⚠ BOSS INCOMING');
+      const names = { charger: '⚠ BRUTE LORD', artillery: '⚠ ARTILLERY', summoner: '⚠ HIVE MIND' };
+      this.banner(names[kind] || '⚠ BOSS INCOMING');
     },
 
     updateEnemies(dt) {
@@ -1082,7 +1087,32 @@
         const e = arr[i];
         const dx = p.x - e.x, dy = p.y - e.y;
         const d = Math.hypot(dx, dy) || 1;
-        if (e.ranged) {
+        if (e.boss) {
+          e.bossT += dt;
+          if (e.bossKind === 'artillery') {
+            // hold range and fire radial bullet bursts
+            const desired = 300;
+            const mv = d > desired + 60 ? 0.6 : (d < desired - 60 ? -0.45 : 0);
+            e.x += (dx / d) * e.speed * mv * dt; e.y += (dy / d) * e.speed * mv * dt;
+            e.shootCd -= dt;
+            if (e.shootCd <= 0) {
+              const n = 14;
+              for (let k = 0; k < n; k++) this.spawnEnemyBullet(e.x, e.y, k / n * TAU + e.bossT * 0.6, e.dmg * 0.55);
+              e.shootCd = 2.6; Sound.shootBig();
+            }
+          } else if (e.bossKind === 'summoner') {
+            e.x += (dx / d) * e.speed * 0.7 * dt; e.y += (dy / d) * e.speed * 0.7 * dt;
+            e.summonCd -= dt;
+            if (e.summonCd <= 0 && this.enemies.length < 260) {
+              for (let k = 0; k < 3; k++) this._createEnemy('grunt', e.x + rand(-30, 30), e.y + rand(-30, 30), true);
+              e.summonCd = 3.2; this.spawnParticles(e.x, e.y, e.color, 10);
+            }
+          } else {
+            // charger: relentless charge
+            e.x += (dx / d) * e.speed * dt; e.y += (dy / d) * e.speed * dt;
+          }
+          e.x += e.knockX * dt; e.y += e.knockY * dt;
+        } else if (e.ranged) {
           // keep stand-off distance, strafe, and fire at the player
           const desired = 240;
           let mv = 0;
