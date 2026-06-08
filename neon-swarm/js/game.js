@@ -41,7 +41,7 @@
   const DIFFICULTIES = [
     { id: 'easy', nm: 'EASY', dmg: 0.7, spawn: 0.85, hp: 0.85, score: 0.7 },
     { id: 'normal', nm: 'NORMAL', dmg: 1.0, spawn: 1.0, hp: 1.0, score: 1.0 },
-    { id: 'hard', nm: 'HARD', dmg: 1.4, spawn: 1.18, hp: 1.25, score: 1.5 },
+    { id: 'hard', nm: 'HARD', dmg: 1.45, spawn: 1.18, hp: 1.12, score: 1.5 },
   ];
   const diffById = (id) => DIFFICULTIES.find(d => d.id === id) || DIFFICULTIES[1];
 
