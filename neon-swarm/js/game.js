@@ -517,6 +517,7 @@
       this.bossSpawned = {};
       this.pendingLevels = 0;
       this._usedContinue = false;
+      this._flash = 0; this._banner = null;
       this.paused = false;
 
       // apply meta upgrades
@@ -1216,6 +1217,7 @@
       p.hp = p.maxHp; p.invuln = 3;
       this.spawnZone(p.x, p.y, 620, 9999, '#ffd84d'); // clear breathing room
       this.shake(14);
+      this.flash(0.5, '255,216,77');
       this.state = 'playing';
       if (window.Ads) Ads.gameplayStart();
       Sound.startMusic(0);
@@ -1346,6 +1348,7 @@
       }
       for (const e of targets) if (e.hp > 0) this.damageEnemy(e, 250, e.x, e.y, '#ff7a3c');
       this.spawnParticles(this.player.x, this.player.y, '#ff7a3c', 30);
+      this.flash(0.45, '255,122,60');
       this.banner('💥 OVERLOAD');
     },
 
@@ -1388,6 +1391,7 @@
     // ---- level up choices ----
     onLevelUp() {
       this.state = 'levelup';
+      this.flash(0.16, '24,224,255');
       Sound.levelup();
       Sound.stopMusic();
       this._luChoices = this.rollChoices();
@@ -1492,6 +1496,7 @@
         this.weapons[c.id] = Math.max(this.weapons[c.id] || 0, WEAPONS[c.id].max);
         Sound.evolve();
         this.shake(12);
+        this.flash(0.55, '255,43,214');
         this.banner('⚡ ' + EVOLUTIONS[c.id].nm.toUpperCase());
       } else if (c.kind === 'weapon') {
         this.weapons[c.id] = (this.weapons[c.id] || 0) + 1;
@@ -1556,6 +1561,9 @@
       ctx.fillStyle = grd;
       ctx.fillRect(0, 0, this.W, this.H);
     },
+
+    _flash: 0, _flashColor: '255,255,255',
+    flash(amt, color) { this._flash = Math.max(this._flash, amt); if (color) this._flashColor = color; },
 
     _banner: null,
     banner(text) { this._banner = { text, life: 1.8 }; },
@@ -1729,6 +1737,13 @@
           ctx.fillText(this._banner.text, this.W / 2, this.H * 0.32);
           ctx.restore();
         }
+      }
+
+      // full-screen flash for big moments
+      if (this._flash > 0.001) {
+        ctx.fillStyle = `rgba(${this._flashColor},${this._flash})`;
+        ctx.fillRect(0, 0, this.W, this.H);
+        this._flash *= 0.86;
       }
     },
 
