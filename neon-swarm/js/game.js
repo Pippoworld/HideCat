@@ -87,7 +87,7 @@
       id: 'pulse', nm: 'Pulse Blaster', ic: '🔫', color: '#18e0ff', max: 8,
       desc: (l) => l === 0 ? 'Auto-fires a bolt at the nearest foe.' :
         l >= 8 ? 'MAX' : '+damage, +bolts, faster fire.',
-      base: { cd: 0.55, dmg: 12, speed: 560, count: 1, pierce: 0 },
+      base: { cd: 0.5, dmg: 14, speed: 560, count: 1, pierce: 0 },
       stat(l) {
         return {
           cd: this.base.cd * (1 - Math.min(0.45, l * 0.06)),
@@ -123,14 +123,14 @@
     orbit: {
       id: 'orbit', nm: 'Orbit Blades', ic: '🌀', color: '#4dff9e', max: 8,
       desc: (l) => l === 0 ? 'Blades spin around you, slicing foes.' : l >= 8 ? 'MAX' : '+blades, +damage, +size.',
-      stat(l) { return { count: 2 + Math.floor((l + 1) / 2), dmg: 8 + l * 4, radius: 78 + l * 6, speed: 2.6 }; },
+      stat(l) { return { count: 2 + Math.floor((l + 1) / 2), dmg: 10 + l * 4, radius: 78 + l * 6, speed: 2.6 }; },
       // handled continuously in game.updateOrbiters
     },
 
     nova: {
       id: 'nova', nm: 'Shock Nova', ic: '💥', color: '#ff2bd6', max: 8,
       desc: (l) => l === 0 ? 'Releases an expanding shockwave.' : l >= 8 ? 'MAX' : '+damage, +area, faster.',
-      stat(l) { return { cd: 2.4 * (1 - Math.min(0.45, l * 0.06)), dmg: 16 + l * 8, radius: 150 + l * 24 }; },
+      stat(l) { return { cd: 1.8 * (1 - Math.min(0.45, l * 0.06)), dmg: 22 + l * 9, radius: 165 + l * 26 }; },
       fire(g, p) {
         const s = this.stat(g.weaponLevel('nova'));
         const evo = g.isEvolved('nova');
@@ -213,7 +213,7 @@
     boomerang: { nm: 'Cyclone', ic: '🌪️', color: '#9af6ff', pass: 'swift', ds: 'Discs that orbit and never return.' },
   };
   const EVO_WEAPON_REQ = 5;   // base weapon level required
-  const EVO_PASSIVE_REQ = 3;  // paired passive level required
+  const EVO_PASSIVE_REQ = 2;  // paired passive level required
 
   // ---------------------------------------------------------------- passives
   const PASSIVES = {
@@ -230,11 +230,11 @@
 
   // ---------------------------------------------------------------- enemies
   const ENEMY_TYPES = {
-    grunt: { hp: 14, speed: 84, r: 14, dmg: 8, xp: 1, color: '#ff5c8a', shape: 'tri', coin: 0.10 },
+    grunt: { hp: 14, speed: 84, r: 14, dmg: 7, xp: 1, color: '#ff5c8a', shape: 'tri', coin: 0.10 },
     swift: { hp: 9, speed: 158, r: 11, dmg: 6, xp: 1, color: '#ffe24d', shape: 'diamond', coin: 0.10 },
-    tank: { hp: 60, speed: 58, r: 22, dmg: 14, xp: 4, color: '#9b5cff', shape: 'hex', coin: 0.18 },
+    tank: { hp: 60, speed: 58, r: 22, dmg: 12, xp: 4, color: '#9b5cff', shape: 'hex', coin: 0.18 },
     bomber: { hp: 22, speed: 96, r: 16, dmg: 18, xp: 2, color: '#ff7a3c', shape: 'square', coin: 0.14, explodes: true },
-    boss: { hp: 1400, speed: 70, r: 46, dmg: 28, xp: 60, color: '#ff2bd6', shape: 'star', coin: 1.0, boss: true },
+    boss: { hp: 850, speed: 62, r: 46, dmg: 20, xp: 60, color: '#ff2bd6', shape: 'star', coin: 1.0, boss: true },
   };
 
   // ---------------------------------------------------------------- entities
@@ -258,7 +258,7 @@
       this.revives = 0;
     }
     get speed() { return this.baseSpeed * this.speedMul; }
-    get pickupR() { return 90 * this.pickupMul; }
+    get pickupR() { return 105 * this.pickupMul; }
   }
 
   // ---------------------------------------------------------------- the game
@@ -440,6 +440,7 @@
       this.weaponTimers = {};
       this.spawnAcc = 0; this.shakeAmt = 0;
       this.bossSpawned = {};
+      this.pendingLevels = 0;
       this.paused = false;
 
       // apply meta upgrades
@@ -537,6 +538,19 @@
         const ps = PASSIVES[id];
         html += `<span class="build-chip">${ps.ic} ${ps.nm} <b>L${this.passives[id]}</b></span>`;
       });
+      // show evolution recipes the player is working toward
+      const recipes = [];
+      for (const id in EVOLUTIONS) {
+        if (this.weapons[id] && !this.isEvolved(id)) {
+          const evo = EVOLUTIONS[id];
+          const pn = PASSIVES[evo.pass] ? PASSIVES[evo.pass].nm : evo.pass;
+          recipes.push(`${WEAPONS[id].ic}+${PASSIVES[evo.pass].ic} → ${evo.ic} <b>${evo.nm}</b>`);
+        }
+      }
+      if (recipes.length) {
+        html += `<div style="margin-top:14px;font-size:12px;color:#8fa8cc">EVOLUTIONS<br>` +
+          recipes.map(r => `<span class="build-chip" style="border-color:rgba(255,43,214,0.3)">${r}</span>`).join('') + '</div>';
+      }
       html += '</div>';
       el.innerHTML = html;
     },
@@ -558,9 +572,15 @@
 
       // movement
       const mv = Input.getMove();
-      p.x += mv.x * p.speed * dt;
-      p.y += mv.y * p.speed * dt;
-      if (mv.x !== 0 || mv.y !== 0) p.facing = Math.atan2(mv.y, mv.x);
+      if (Number.isFinite(mv.x) && Number.isFinite(mv.y)) {
+        p.x += mv.x * p.speed * dt;
+        p.y += mv.y * p.speed * dt;
+        if (mv.x !== 0 || mv.y !== 0) {
+          p.facing = Math.atan2(mv.y, mv.x);
+          this._heading = p.facing;
+          this._moving = true;
+        } else this._moving = false;
+      }
 
       // regen + timers
       if (p.regen > 0 && p.hp < p.maxHp) p.hp = Math.min(p.maxHp, p.hp + p.regen * dt);
@@ -702,20 +722,21 @@
     updateSpawning(dt) {
       this.spawnAcc += dt;
       const t = this.time;
-      const cap = 320;
+      const cap = Math.min(280, 150 + Math.floor(t / 5)); // density grows over time
       if (this.enemies.length >= cap) { this.spawnAcc = 0; }
       // spawn rate ramps up over time
-      const interval = clamp(0.7 - t * 0.005, 0.12, 0.7);
-      const batch = 2 + Math.floor(t / 22);
+      const interval = clamp(0.85 - t * 0.0042, 0.16, 0.85);
+      const batch = 1 + Math.floor(t / 30);
       if (this.spawnAcc >= interval && this.enemies.length < cap) {
         this.spawnAcc = 0;
         for (let i = 0; i < batch; i++) this.spawnEnemy();
       }
-      // boss every 120s
-      const bossWave = Math.floor(t / 120);
+      // boss every 90s; doubles up after 5 minutes
+      const bossWave = Math.floor(t / 90);
       if (bossWave >= 1 && !this.bossSpawned[bossWave]) {
         this.bossSpawned[bossWave] = true;
         this.spawnBoss(bossWave);
+        if (t > 300) this.spawnBoss(bossWave);
       }
     },
 
@@ -731,12 +752,19 @@
     spawnEnemy(forceType) {
       const type = forceType || this.enemyMix();
       const def = ENEMY_TYPES[type];
-      const ang = rand(0, TAU);
-      const d = Math.max(this.W, this.H) * 0.62 + rand(0, 120);
+      // Predictive spawning: while the player is moving, bias most spawns into the
+      // forward arc so they can't outrun the swarm into empty space.
+      let ang;
+      if (this._moving && Math.random() < 0.7) {
+        ang = (this._heading || 0) + rand(-1.15, 1.15);
+      } else {
+        ang = rand(0, TAU);
+      }
+      const d = Math.max(this.W, this.H) * 0.6 + rand(0, 120);
       const x = this.player.x + Math.cos(ang) * d;
       const y = this.player.y + Math.sin(ang) * d;
       // scale hp with time
-      const hpScale = 1 + this.time * 0.018;
+      const hpScale = 1 + this.time * 0.009;
       this.enemies.push({
         id: this._eid = (this._eid || 0) + 1,
         type, x, y,
@@ -752,7 +780,7 @@
       const def = ENEMY_TYPES.boss;
       const ang = rand(0, TAU);
       const d = Math.max(this.W, this.H) * 0.6;
-      const hpScale = 1 + wave * 0.8 + this.time * 0.02;
+      const hpScale = 1 + wave * 0.6 + this.time * 0.01;
       this.enemies.push({
         id: this._eid = (this._eid || 0) + 1,
         type: 'boss', x: this.player.x + Math.cos(ang) * d, y: this.player.y + Math.sin(ang) * d,
@@ -961,7 +989,7 @@
     hurtPlayer(dmg) {
       const p = this.player;
       p.hp -= dmg;
-      p.invuln = 0.6;
+      p.invuln = 0.7;
       p.hitFlash = 0.25;
       this.shake(6);
       Sound.hurt();
@@ -1005,19 +1033,30 @@
       const p = this.player;
       const pr = p.pickupR;
       const pr2 = pr * pr;
-      // gems
+      // cap field gems for perf/clarity: sweep oldest into XP when too many pile up
+      const GEM_CAP = 140;
+      if (this.gems.length > GEM_CAP) {
+        const excess = this.gems.length - GEM_CAP;
+        let bonus = 0;
+        for (let k = 0; k < excess; k++) bonus += this.gems[k].xp;
+        this.gems.splice(0, excess);
+        if (bonus > 0) this.gainXP(bonus);
+      }
+      if (this.coins.length > 80) this.coins.splice(0, this.coins.length - 80);
+      // gems: hard-pull within pickup radius, soft-drift within a wider radius so
+      // kited XP is never permanently lost.
+      const soft2 = (pr * 2.4) * (pr * 2.4);
       for (let i = this.gems.length - 1; i >= 0; i--) {
         const g = this.gems[i];
         const dd = dist2(g.x, g.y, p.x, p.y);
         if (g.pulled || dd < pr2) {
           g.pulled = true;
           const dx = p.x - g.x, dy = p.y - g.y; const d = Math.hypot(dx, dy) || 1;
-          const spd = 380;
-          g.x += (dx / d) * spd * dt; g.y += (dy / d) * spd * dt;
-          if (d < p.r + 6) {
-            this.gainXP(g.xp);
-            this.gems.splice(i, 1);
-          }
+          g.x += (dx / d) * 400 * dt; g.y += (dy / d) * 400 * dt;
+          if (d < p.r + 6) { this.gainXP(g.xp); this.gems.splice(i, 1); }
+        } else if (dd < soft2) {
+          const dx = p.x - g.x, dy = p.y - g.y; const d = Math.hypot(dx, dy) || 1;
+          g.x += (dx / d) * 150 * dt; g.y += (dy / d) * 150 * dt;
         } else {
           g.x += g.vx * dt; g.y += g.vy * dt; g.vx *= 0.9; g.vy *= 0.9;
         }
@@ -1049,7 +1088,15 @@
       while (p.xp >= p.xpNext) {
         p.xp -= p.xpNext;
         p.level++;
-        p.xpNext = Math.floor(5 + p.level * 4 + Math.pow(p.level, 1.55));
+        p.xpNext = Math.floor(4 + p.level * 3 + Math.pow(p.level, 1.4));
+        this.pendingLevels++;
+      }
+      this.maybeShowLevelUp();
+    },
+
+    maybeShowLevelUp() {
+      if (this.state === 'playing' && this.pendingLevels > 0) {
+        this.pendingLevels--;
         this.onLevelUp();
       }
     },
@@ -1139,6 +1186,11 @@
           ic = w.ic; nm = w.nm; color = w.color;
           ds = w.desc(c.lvl);
           lvlText = c.isNew ? '<span class="tag-new">NEW</span>' : `Level ${c.lvl} → ${c.lvl + 1}`;
+          const evo = EVOLUTIONS[c.id];
+          if (evo && !this.isEvolved(c.id)) {
+            const pn = PASSIVES[evo.pass] ? PASSIVES[evo.pass].nm : evo.pass;
+            ds += `<div style="margin-top:6px;font-size:11px;color:var(--neon2)">★ Evolves with <b>${pn}</b></div>`;
+          }
         } else if (c.kind === 'passive') {
           const ps = PASSIVES[c.id];
           ic = ps.ic; nm = ps.nm; color = ps.color; ds = ps.ds;
@@ -1180,7 +1232,11 @@
       }
       document.getElementById('levelup').classList.add('hidden');
       this.state = 'playing';
-      Sound.startMusic(0);
+      if (this.pendingLevels > 0) {
+        this.maybeShowLevelUp();
+      } else {
+        Sound.startMusic(0);
+      }
     },
 
     // ---- particles & text & banner ----
