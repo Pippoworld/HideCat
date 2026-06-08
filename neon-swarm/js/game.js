@@ -67,14 +67,22 @@
       },
       fire(g, p) {
         const s = this.stat(g.weaponLevel('pulse'));
-        const targets = g.nearestEnemies(p.x, p.y, s.count);
-        const n = s.count;
+        const evo = g.isEvolved('pulse');
+        const dmg = (s.dmg * (evo ? 2 : 1)) * g.dmgMul;
+        const pierce = s.pierce + (evo ? 3 : 0);
+        const col = evo ? EVOLUTIONS.pulse.color : this.color;
+        const n = s.count + (evo ? 2 : 0);
+        const targets = g.nearestEnemies(p.x, p.y, n);
         for (let i = 0; i < n; i++) {
           let ang;
           if (targets[i]) ang = Math.atan2(targets[i].y - p.y, targets[i].x - p.x);
-          else if (targets[0]) ang = Math.atan2(targets[0].y - p.y, targets[0].x - p.x) + rand(-0.3, 0.3);
+          else if (targets[0]) ang = Math.atan2(targets[0].y - p.y, targets[0].x - p.x) + rand(-0.4, 0.4);
           else ang = rand(0, TAU);
-          g.spawnBullet(p.x, p.y, ang, s.speed, s.dmg * g.dmgMul, s.pierce, this.color, 5);
+          g.spawnBullet(p.x, p.y, ang, s.speed, dmg, pierce, col, evo ? 6 : 5);
+        }
+        if (evo) { // extra omnidirectional ring
+          const ring = 8;
+          for (let k = 0; k < ring; k++) g.spawnBullet(p.x, p.y, (k / ring) * TAU, s.speed * 0.9, dmg * 0.7, pierce, col, 5);
         }
         Sound.shoot();
       },
@@ -93,7 +101,8 @@
       stat(l) { return { cd: 2.4 * (1 - Math.min(0.45, l * 0.06)), dmg: 16 + l * 8, radius: 150 + l * 24 }; },
       fire(g, p) {
         const s = this.stat(g.weaponLevel('nova'));
-        g.spawnZone(p.x, p.y, s.radius * g.areaMul, s.dmg * g.dmgMul, this.color);
+        const evo = g.isEvolved('nova');
+        g.spawnZone(p.x, p.y, s.radius * g.areaMul * (evo ? 1.4 : 1), s.dmg * g.dmgMul * (evo ? 2 : 1), evo ? EVOLUTIONS.nova.color : this.color, evo);
         Sound.shootBig();
       },
     },
@@ -104,7 +113,13 @@
       stat(l) { return { cd: 1.1 * (1 - Math.min(0.4, l * 0.05)), dmg: 14 + l * 6, jumps: 2 + Math.floor(l / 1.5) }; },
       fire(g, p) {
         const s = this.stat(g.weaponLevel('chain'));
-        g.castChain(p.x, p.y, s.dmg * g.dmgMul, s.jumps, this.color);
+        const evo = g.isEvolved('chain');
+        if (evo) {
+          g.castChain(p.x, p.y, s.dmg * g.dmgMul * 1.6, s.jumps * 2, EVOLUTIONS.chain.color);
+          g.castChain(p.x, p.y, s.dmg * g.dmgMul * 1.6, s.jumps * 2, EVOLUTIONS.chain.color);
+        } else {
+          g.castChain(p.x, p.y, s.dmg * g.dmgMul, s.jumps, this.color);
+        }
       },
     },
 
@@ -114,11 +129,16 @@
       stat(l) { return { cd: 0.9 * (1 - Math.min(0.4, l * 0.05)), dmg: 9 + l * 4, pellets: 4 + l, spread: 0.9 }; },
       fire(g, p) {
         const s = this.stat(g.weaponLevel('shotgun'));
+        const evo = g.isEvolved('shotgun');
+        const pellets = Math.round(s.pellets * (evo ? 1.7 : 1));
+        const dmg = s.dmg * g.dmgMul * (evo ? 1.6 : 1);
+        const col = evo ? EVOLUTIONS.shotgun.color : this.color;
+        const spread = evo ? s.spread * 1.4 : s.spread;
         const t = g.nearestEnemies(p.x, p.y, 1)[0];
         const base = t ? Math.atan2(t.y - p.y, t.x - p.x) : rand(0, TAU);
-        for (let i = 0; i < s.pellets; i++) {
-          const ang = base + rand(-s.spread / 2, s.spread / 2);
-          g.spawnBullet(p.x, p.y, ang, rand(420, 540), s.dmg * g.dmgMul, 0, this.color, 4, 0.5);
+        for (let i = 0; i < pellets; i++) {
+          const ang = base + rand(-spread / 2, spread / 2);
+          g.spawnBullet(p.x, p.y, ang, rand(420, 560), dmg, evo ? 1 : 0, col, evo ? 5 : 4, 0.5);
         }
         Sound.shootBig();
       },
@@ -130,16 +150,38 @@
       stat(l) { return { cd: 1.4 * (1 - Math.min(0.4, l * 0.05)), dmg: 11 + l * 5, count: 1 + Math.floor(l / 3), range: 260 + l * 20 }; },
       fire(g, p) {
         const s = this.stat(g.weaponLevel('boomerang'));
-        const t = g.nearestEnemies(p.x, p.y, 1)[0];
-        const base = t ? Math.atan2(t.y - p.y, t.x - p.x) : rand(0, TAU);
-        for (let i = 0; i < s.count; i++) {
-          const ang = base + (i - (s.count - 1) / 2) * 0.4;
-          g.spawnBoomerang(p.x, p.y, ang, s.dmg * g.dmgMul, s.range * g.areaMul, this.color);
+        const evo = g.isEvolved('boomerang');
+        const count = s.count + (evo ? 3 : 0);
+        const dmg = s.dmg * g.dmgMul * (evo ? 1.6 : 1);
+        const col = evo ? EVOLUTIONS.boomerang.color : this.color;
+        if (evo) {
+          // orbiting ring of discs
+          for (let i = 0; i < count; i++) g.spawnBoomerang(p.x, p.y, (i / count) * TAU, dmg, s.range * g.areaMul * 1.3, col, true);
+        } else {
+          const t = g.nearestEnemies(p.x, p.y, 1)[0];
+          const base = t ? Math.atan2(t.y - p.y, t.x - p.x) : rand(0, TAU);
+          for (let i = 0; i < count; i++) {
+            const ang = base + (i - (count - 1) / 2) * 0.4;
+            g.spawnBoomerang(p.x, p.y, ang, dmg, s.range * g.areaMul, col);
+          }
         }
         Sound.shoot();
       },
     },
   };
+
+  // ---------------------------------------------------------------- evolutions
+  // Max(ish) a weapon + pair passive -> unlock a transformed super-weapon.
+  const EVOLUTIONS = {
+    pulse: { nm: 'Pulse Storm', ic: '🌟', color: '#9af6ff', pass: 'haste', ds: 'A storm of piercing bolts in every direction.' },
+    orbit: { nm: 'Saw Halo', ic: '☄️', color: '#4dffd0', pass: 'area', ds: 'A roaring halo of giant blades.' },
+    nova: { nm: 'Singularity', ic: '🕳️', color: '#c46bff', pass: 'might', ds: 'Implodes foes inward, then detonates.' },
+    chain: { nm: 'Storm Caller', ic: '⛈️', color: '#fff06b', pass: 'crit', ds: 'Relentless forking lightning.' },
+    shotgun: { nm: 'Flak Cannon', ic: '💢', color: '#ff9a3c', pass: 'magnet', ds: 'A devastating point-blank wall of shot.' },
+    boomerang: { nm: 'Cyclone', ic: '🌪️', color: '#9af6ff', pass: 'swift', ds: 'Discs that orbit and never return.' },
+  };
+  const EVO_WEAPON_REQ = 5;   // base weapon level required
+  const EVO_PASSIVE_REQ = 3;  // paired passive level required
 
   // ---------------------------------------------------------------- passives
   const PASSIVES = {
@@ -307,6 +349,7 @@
       this.time = 0; this.kills = 0; this.runCoins = 0;
       this.weapons = { pulse: 1 };
       this.passives = {};
+      this.evolved = {};
       this.weaponTimers = {};
       this.spawnAcc = 0; this.shakeAmt = 0;
       this.bossSpawned = {};
@@ -349,6 +392,12 @@
     },
 
     weaponLevel(id) { return (this.weapons[id] || 1) - 1; }, // 0-indexed for stat()
+    isEvolved(id) { return !!(this.evolved && this.evolved[id]); },
+    isEvolveReady(id) {
+      const evo = EVOLUTIONS[id];
+      if (!evo || this.isEvolved(id)) return false;
+      return (this.weapons[id] || 0) >= EVO_WEAPON_REQ && (this.passives[evo.pass] || 0) >= EVO_PASSIVE_REQ;
+    },
 
     // ---- input → player movement ----
     togglePause() {
@@ -369,7 +418,12 @@
       let html = '<div>';
       Object.keys(this.weapons).forEach(id => {
         const w = WEAPONS[id];
-        html += `<span class="build-chip">${w.ic} ${w.nm} <b>L${this.weapons[id]}</b></span>`;
+        if (this.isEvolved(id)) {
+          const evo = EVOLUTIONS[id];
+          html += `<span class="build-chip" style="border-color:var(--neon2)">${evo.ic} ${evo.nm} <b>★</b></span>`;
+        } else {
+          html += `<span class="build-chip">${w.ic} ${w.nm} <b>L${this.weapons[id]}</b></span>`;
+        }
       });
       Object.keys(this.passives).forEach(id => {
         const ps = PASSIVES[id];
@@ -441,7 +495,8 @@
         if (!w.fire) continue; // continuous weapons (orbit) handled elsewhere
         const lvl = this.weaponLevel(id);
         const stat = w.stat ? w.stat(lvl) : null;
-        const cd = (stat && stat.cd ? stat.cd : 0.6) * this.player.fireRateMul;
+        let cd = (stat && stat.cd ? stat.cd : 0.6) * this.player.fireRateMul;
+        if (this.isEvolved(id)) cd *= 0.6;
         this.weaponTimers[id] = (this.weaponTimers[id] || 0) - dt;
         if (this.weaponTimers[id] <= 0) {
           this.weaponTimers[id] = cd;
@@ -453,24 +508,29 @@
     updateOrbiters(dt) {
       if (!this.weapons.orbit) { this.orbiters = []; return; }
       const s = WEAPONS.orbit.stat(this.weaponLevel('orbit'));
+      const evo = this.isEvolved('orbit');
+      const count = s.count + (evo ? 3 : 0);
+      const dmgEach = s.dmg * (evo ? 1.8 : 1);
       // rebuild count if changed
-      if (this.orbiters.length !== s.count) {
+      if (this.orbiters.length !== count) {
         this.orbiters = [];
-        for (let i = 0; i < s.count; i++) this.orbiters.push({ a: (i / s.count) * TAU, hitCd: {} });
+        for (let i = 0; i < count; i++) this.orbiters.push({ a: (i / count) * TAU, hitCd: {} });
       }
       const p = this.player;
-      const radius = s.radius * p.areaMul;
+      const radius = s.radius * p.areaMul * (evo ? 1.35 : 1);
+      this._orbBladeR = evo ? 16 : 9;
       for (const o of this.orbiters) {
-        o.a += s.speed * dt;
+        o.a += s.speed * (evo ? 1.25 : 1) * dt;
         o.x = p.x + Math.cos(o.a) * radius;
         o.y = p.y + Math.sin(o.a) * radius;
         // decrement hit cooldowns
         for (const k in o.hitCd) { o.hitCd[k] -= dt; if (o.hitCd[k] <= 0) delete o.hitCd[k]; }
         // damage enemies (grid-accelerated)
-        this.forEachNear(o.x, o.y, 40, (e) => {
-          const rr = (e.r + 12);
+        const bladeR = this._orbBladeR;
+        this.forEachNear(o.x, o.y, bladeR + 30, (e) => {
+          const rr = (e.r + bladeR);
           if (!o.hitCd[e.id] && e.hp > 0 && dist2(o.x, o.y, e.x, e.y) < rr * rr) {
-            this.damageEnemy(e, s.dmg * p.dmgMul, o.x, o.y, WEAPONS.orbit.color);
+            this.damageEnemy(e, dmgEach * p.dmgMul, o.x, o.y, evo ? EVOLUTIONS.orbit.color : WEAPONS.orbit.color);
             o.hitCd[e.id] = 0.35;
           }
         });
@@ -630,10 +690,11 @@
       });
     },
 
-    spawnBoomerang(x, y, ang, dmg, range, color) {
+    spawnBoomerang(x, y, ang, dmg, range, color, orbit) {
       this.booms.push({
         x, y, ox: x, oy: y, ang, dmg, range, color,
-        t: 0, speed: 520, phase: 'out', r: 11, spin: 0, hit: {},
+        t: 0, speed: 520, phase: orbit ? 'orbit' : 'out', r: orbit ? 13 : 11, spin: 0, hit: {},
+        orbit: !!orbit, orbitA: ang, life: orbit ? 3.5 : 0, hitCd: {},
       });
     },
 
@@ -664,6 +725,20 @@
       for (let i = arr.length - 1; i >= 0; i--) {
         const b = arr[i];
         b.t += dt; b.spin += dt * 16;
+        if (b.phase === 'orbit') {
+          b.orbitA += dt * 3.2;
+          b.x = p.x + Math.cos(b.orbitA) * b.range;
+          b.y = p.y + Math.sin(b.orbitA) * b.range;
+          b.life -= dt;
+          for (const k in b.hitCd) { b.hitCd[k] -= dt; if (b.hitCd[k] <= 0) delete b.hitCd[k]; }
+          this.forEachNear(b.x, b.y, b.r + 24, (e) => {
+            if (b.hitCd[e.id] || e.hp <= 0) return;
+            const rr = e.r + b.r;
+            if (dist2(b.x, b.y, e.x, e.y) < rr * rr) { this.damageEnemy(e, b.dmg, b.x, b.y, b.color); b.hitCd[e.id] = 0.4; }
+          });
+          if (b.life <= 0) arr.splice(i, 1);
+          continue;
+        }
         if (b.phase === 'out') {
           b.x += Math.cos(b.ang) * b.speed * dt;
           b.y += Math.sin(b.ang) * b.speed * dt;
@@ -687,8 +762,8 @@
     },
 
     // ---- zones (nova) ----
-    spawnZone(x, y, radius, dmg, color) {
-      this.zones.push({ x, y, r: 0, maxR: radius, dmg, color, hit: {}, life: 0.45 });
+    spawnZone(x, y, radius, dmg, color, implode) {
+      this.zones.push({ x, y, r: 0, maxR: radius, dmg, color, hit: {}, life: 0.45, implode: !!implode });
     },
 
     updateZones(dt) {
@@ -703,7 +778,8 @@
           if (dist2(z.x, z.y, e.x, e.y) < rr * rr) {
             this.damageEnemy(e, z.dmg, e.x, e.y, z.color);
             z.hit[e.id] = true;
-            e.knockX += (e.x - z.x) * 1.2; e.knockY += (e.y - z.y) * 1.2;
+            const dir = z.implode ? -2.2 : 1.2;
+            e.knockX += (e.x - z.x) * dir; e.knockY += (e.y - z.y) * dir;
           }
         });
         if (z.life <= 0) arr.splice(i, 1);
@@ -893,6 +969,9 @@
 
     rollChoices() {
       const pool = [];
+      // evolutions take priority — they are the payoff of a build
+      const evos = [];
+      for (const id in EVOLUTIONS) if (this.isEvolveReady(id)) evos.push({ kind: 'evolve', id });
       // weapon upgrades / new weapons
       for (const id in WEAPONS) {
         const w = WEAPONS[id];
@@ -911,8 +990,9 @@
         if (cur < ps.max) pool.push({ kind: 'passive', id, lvl: cur, isNew: cur === 0 });
       }
       // heal option fallback
-      // pick 3 unique
+      // pick up to 3 unique; force-include any ready evolutions first
       const out = [];
+      for (const e of evos) { if (out.length < 3) out.push(e); }
       const copy = pool.slice();
       while (out.length < 3 && copy.length) {
         const idx = Math.floor(Math.random() * copy.length);
@@ -930,6 +1010,17 @@
         const card = document.createElement('div');
         card.className = 'lu-card';
         let ic, nm, ds, lvlText, color;
+        if (c.kind === 'evolve') {
+          const evo = EVOLUTIONS[c.id];
+          card.className = 'lu-card evo';
+          ic = evo.ic; nm = evo.nm; color = evo.color; ds = evo.ds;
+          lvlText = '<span class="tag-new" style="background:var(--neon2);color:#fff">⚡ EVOLUTION</span>';
+          card.innerHTML = `<div class="ic" style="color:${color}">${ic}</div>
+            <div class="nm">${nm}</div><div class="lvl">${lvlText}</div><div class="ds">${ds}</div>`;
+          card.onclick = () => this.chooseUpgrade(c);
+          cont.appendChild(card);
+          return;
+        }
         if (c.kind === 'weapon') {
           const w = WEAPONS[c.id];
           ic = w.ic; nm = w.nm; color = w.color;
@@ -959,7 +1050,13 @@
 
     chooseUpgrade(c) {
       Sound.select();
-      if (c.kind === 'weapon') {
+      if (c.kind === 'evolve') {
+        this.evolved[c.id] = true;
+        this.weapons[c.id] = Math.max(this.weapons[c.id] || 0, WEAPONS[c.id].max);
+        Sound.evolve();
+        this.shake(12);
+        this.banner('⚡ ' + EVOLUTIONS[c.id].nm.toUpperCase());
+      } else if (c.kind === 'weapon') {
         this.weapons[c.id] = (this.weapons[c.id] || 0) + 1;
       } else if (c.kind === 'passive') {
         this.passives[c.id] = (this.passives[c.id] || 0) + 1;
@@ -1071,9 +1168,11 @@
         ctx.restore();
       }
       // orbiters
+      const orbEvo = this.isEvolved('orbit');
+      const orbR = this._orbBladeR || 9;
+      ctx.fillStyle = orbEvo ? EVOLUTIONS.orbit.color : WEAPONS.orbit.color;
       for (const o of this.orbiters) {
-        ctx.fillStyle = WEAPONS.orbit.color;
-        ctx.beginPath(); ctx.arc(o.x, o.y, 9, 0, TAU); ctx.fill();
+        ctx.beginPath(); ctx.arc(o.x, o.y, orbR, 0, TAU); ctx.fill();
       }
       ctx.globalCompositeOperation = 'source-over';
 
