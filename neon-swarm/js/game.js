@@ -400,6 +400,11 @@
       $('diff-next').onclick = () => this.cycleDifficulty(1);
       $('pause-btn').onclick = () => this.togglePause();
       $('resume-btn').onclick = () => this.togglePause();
+      $('restart-btn').onclick = () => {
+        document.getElementById('pause').classList.add('hidden');
+        this.endRun(false);
+        if (this.isDaily) this.startDaily(); else this.startRun(this.charId);
+      };
       $('quit-btn').onclick = () => { if (window.Ads) Ads.gameplayStop(); this.endRun(false); this.showMenu(); };
       $('retry-btn').onclick = async () => { if (window.Ads) await Ads.interstitial(); if (this.isDaily) this.startDaily(); else this.startRun(this.charId); };
       $('menu-btn').onclick = async () => { if (window.Ads) await Ads.interstitial(); this.showMenu(); };
@@ -835,11 +840,20 @@
       const raw = (t - this.lastTime) / 1000 || 0;
       const dt = Math.min(0.033, raw);
       this.lastTime = t;
-      if (this.state === 'playing') {
-        this.update(dt);
-        this._perfWatch(raw * 1000);
+      try {
+        if (this.state === 'playing') {
+          this.update(dt);
+          this._perfWatch(raw * 1000);
+        }
+        this.render();
+      } catch (err) {
+        // never leave the player on a dead screen; log/report and keep running
+        this._errCount = (this._errCount || 0) + 1;
+        if (this._errCount <= 3) {
+          console.error('NEON SWARM loop error:', err);
+          if (window.Analytics) Analytics.track('error', { msg: String((err && err.message) || err), where: this.state });
+        }
       }
-      this.render();
       requestAnimationFrame((tt) => this.loop(tt));
     },
 
