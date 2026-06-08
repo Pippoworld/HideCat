@@ -313,6 +313,7 @@
       this.ctx = this.canvas.getContext('2d');
       Meta.load();
       if (window.Ads) Ads.init();
+      if (window.Analytics) Analytics.init();
       Input.init(this.canvas);
       this.genStars();
       this.resize();
@@ -601,6 +602,7 @@
       this.recalc();
       Sound.startMusic(0);
       if (window.Ads) Ads.gameplayStart();
+      this.track('run_start', { pilot: this.charId, difficulty: this.diff.id, run: Meta.data.runs + 1 });
       // first-time onboarding hint
       this._hintLife = Meta.data.seenTutorial ? 0 : 4.5;
       if (!Meta.data.seenTutorial) { Meta.data.seenTutorial = 1; Meta.save(); }
@@ -636,6 +638,12 @@
       });
       this._newAwards = this.checkAchievements();
       Meta.save();
+      if (record) this.track('run_end', {
+        score: this.finalScore, level: p.level, time: Math.floor(this.time),
+        kills: this.kills, coins: this.runCoins, pilot: this.charId,
+        difficulty: this.diff ? this.diff.id : 'normal', evolved: Object.keys(this.evolved || {}).length,
+      });
+      (this._newAwards || []).forEach(a => this.track('achievement', { id: a.id }));
     },
 
     checkAchievements() {
@@ -666,6 +674,7 @@
     },
 
     comboMult() { return 1 + Math.min(this.combo, 50) * 0.03; }, // up to 2.5x
+    track(event, props) { if (window.Analytics) Analytics.track(event, props); },
     weaponLevel(id) { return (this.weapons[id] || 1) - 1; }, // 0-indexed for stat()
     isEvolved(id) { return !!(this.evolved && this.evolved[id]); },
     isEvolveReady(id) {
@@ -1567,6 +1576,7 @@
         this.shake(12);
         this.flash(0.55, '255,43,214');
         this.banner('⚡ ' + EVOLUTIONS[c.id].nm.toUpperCase());
+        this.track('evolve', { weapon: c.id, level: this.player.level, time: Math.floor(this.time) });
       } else if (c.kind === 'weapon') {
         this.weapons[c.id] = (this.weapons[c.id] || 0) + 1;
       } else if (c.kind === 'passive') {
