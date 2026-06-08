@@ -20,19 +20,51 @@
   // ---------------------------------------------------------------- meta save
   const SAVE_KEY = 'neonswarm_save_v1';
   const Meta = {
-    data: { coins: 0, best: 0, bestTime: 0, runs: 0, upgrades: {} },
+    data: { coins: 0, best: 0, bestTime: 0, runs: 0, totalKills: 0, upgrades: {}, chars: { vanguard: 1 }, muted: 0, lastChar: 'vanguard' },
     load() {
       try {
         const s = JSON.parse(localStorage.getItem(SAVE_KEY));
         if (s) this.data = Object.assign(this.data, s);
         if (!this.data.upgrades) this.data.upgrades = {};
+        if (!this.data.chars) this.data.chars = { vanguard: 1 };
       } catch (e) {}
     },
     save() {
       try { localStorage.setItem(SAVE_KEY, JSON.stringify(this.data)); } catch (e) {}
     },
     lvl(id) { return this.data.upgrades[id] || 0; },
+    hasChar(id) { return !!this.data.chars[id]; },
   };
+
+  // ---------------------------------------------------------------- characters
+  const CHARACTERS = [
+    {
+      id: 'vanguard', nm: 'Vanguard', ic: '🛸', color: '#18e0ff',
+      ds: 'Balanced all-rounder. No weaknesses.', weapon: 'pulse',
+      mods: {}, unlock: { type: 'free' },
+    },
+    {
+      id: 'striker', nm: 'Striker', ic: '🔺', color: '#ff4d6d',
+      ds: '+25% damage, +6% crit, but 25% less HP. Glass cannon.', weapon: 'shotgun',
+      mods: { dmgMul: 0.25, crit: 0.06, hpMul: -0.25 }, unlock: { type: 'coins', amt: 200 },
+    },
+    {
+      id: 'warden', nm: 'Warden', ic: '🛡️', color: '#9b5cff',
+      ds: '+45% HP, +0.5 regen, but 12% slower. Bruiser.', weapon: 'orbit',
+      mods: { hpMul: 0.45, regen: 0.5, speedMul: -0.12 }, unlock: { type: 'coins', amt: 250 },
+    },
+    {
+      id: 'sprinter', nm: 'Sprinter', ic: '⚡', color: '#ffd84d',
+      ds: '+22% speed, +40% pickup, faster fire. Hit-and-run.', weapon: 'boomerang',
+      mods: { speedMul: 0.22, pickupMul: 0.40, fireRateMul: 0.88 }, unlock: { type: 'level', amt: 15 },
+    },
+    {
+      id: 'tempest', nm: 'Tempest', ic: '🌩️', color: '#fff06b',
+      ds: '+15% area, +12% XP, starts with the Tesla Coil.', weapon: 'chain',
+      mods: { areaMul: 0.15, xpMul: 0.12 }, unlock: { type: 'time', amt: 300 },
+    },
+  ];
+  const charById = (id) => CHARACTERS.find(c => c.id === id) || CHARACTERS[0];
 
   // Meta upgrade definitions (permanent, bought with coins)
   const META_UPGRADES = [
@@ -275,21 +307,72 @@
     // ---- UI wiring ----
     wireUI() {
       const $ = (id) => document.getElementById(id);
-      $('play-btn').onclick = () => { Sound.init(); Sound.resume(); this.startRun(); };
+      $('play-btn').onclick = () => { Sound.init(); Sound.resume(); this.showCharSelect(); };
       $('upgrades-btn').onclick = () => this.showShop();
       $('how-btn').onclick = () => { this.hideAll(); $('howto').classList.remove('hidden'); };
       $('howto-back').onclick = () => this.showMenu();
       $('shop-back').onclick = () => this.showMenu();
+      $('char-back').onclick = () => this.showMenu();
       $('pause-btn').onclick = () => this.togglePause();
       $('resume-btn').onclick = () => this.togglePause();
       $('quit-btn').onclick = () => { this.endRun(false); this.showMenu(); };
-      $('retry-btn').onclick = () => this.startRun();
+      $('retry-btn').onclick = () => this.startRun(this.charId);
       $('menu-btn').onclick = () => this.showMenu();
       $('lu-reroll').onclick = () => this.reroll();
+      const mute = $('mute-btn');
+      Sound.setMuted(!!Meta.data.muted);
+      mute.textContent = Meta.data.muted ? '🔇' : '🔊';
+      mute.onclick = () => {
+        Meta.data.muted = Meta.data.muted ? 0 : 1;
+        Meta.save();
+        Sound.init(); Sound.setMuted(!!Meta.data.muted);
+        mute.textContent = Meta.data.muted ? '🔇' : '🔊';
+      };
+    },
+
+    // ---- character select ----
+    showCharSelect() {
+      this.state = 'charselect';
+      this.hideAll();
+      document.getElementById('charselect').classList.remove('hidden');
+      this.renderChars();
+    },
+
+    renderChars() {
+      const grid = document.getElementById('char-grid');
+      grid.innerHTML = '';
+      CHARACTERS.forEach(c => {
+        const unlocked = c.unlock.type === 'free' || Meta.hasChar(c.id);
+        const card = document.createElement('div');
+        card.className = 'char-card' + (unlocked ? '' : ' locked');
+        const w = WEAPONS[c.weapon];
+        let lockLine = '';
+        if (!unlocked) {
+          if (c.unlock.type === 'coins') lockLine = `<div class="lock">🔒 Unlock: ◈ ${c.unlock.amt}</div>`;
+          else if (c.unlock.type === 'level') lockLine = `<div class="lock">🔒 Reach Level ${c.unlock.amt}</div>`;
+          else if (c.unlock.type === 'time') lockLine = `<div class="lock">🔒 Survive ${Math.floor(c.unlock.amt / 60)} min</div>`;
+        }
+        card.innerHTML = `<div class="ic" style="color:${c.color}">${c.ic}</div>
+          <div class="nm">${c.nm}</div><div class="ds">${c.ds}</div>
+          <div class="wp">${w.ic} ${w.nm}</div>${lockLine}`;
+        if (unlocked) {
+          card.onclick = () => { Sound.select(); this.startRun(c.id); };
+        } else if (c.unlock.type === 'coins') {
+          card.onclick = () => {
+            if (Meta.data.coins >= c.unlock.amt) {
+              Meta.data.coins -= c.unlock.amt;
+              Meta.data.chars[c.id] = 1;
+              Meta.save(); Sound.evolve();
+              this.renderChars();
+            } else { Sound.hurt(); }
+          };
+        }
+        grid.appendChild(card);
+      });
     },
 
     hideAll() {
-      ['menu', 'levelup', 'pause', 'gameover', 'shop', 'howto'].forEach(id => document.getElementById(id).classList.add('hidden'));
+      ['menu', 'levelup', 'pause', 'gameover', 'shop', 'howto', 'charselect'].forEach(id => document.getElementById(id).classList.add('hidden'));
       document.getElementById('hud').classList.add('hidden');
     },
 
@@ -337,17 +420,21 @@
     },
 
     // ---- run lifecycle ----
-    startRun() {
+    startRun(charId) {
       Sound.init(); Sound.resume();
+      Sound.setMuted(!!Meta.data.muted);
       this.hideAll();
       document.getElementById('hud').classList.remove('hidden');
       this.state = 'playing';
+      this.charId = charId || this.charId || 'vanguard';
+      const ch = charById(this.charId);
+      Meta.data.lastChar = this.charId; Meta.save();
       this.player = new Player();
       this.enemies = []; this.bullets = []; this.gems = []; this.coins = [];
       this.particles = []; this.dmgTexts = []; this.zones = []; this.orbiters = []; this.booms = [];
       this.cam = { x: 0, y: 0, shake: 0 };
       this.time = 0; this.kills = 0; this.runCoins = 0;
-      this.weapons = { pulse: 1 };
+      this.weapons = {}; this.weapons[ch.weapon] = 1;
       this.passives = {};
       this.evolved = {};
       this.weaponTimers = {};
@@ -368,6 +455,19 @@
       p.revives = Meta.lvl('revive');
       this.rerolls = 1 + Meta.lvl('luck');
 
+      // apply character modifiers
+      const m = ch.mods || {};
+      if (m.hpMul) { p.maxHp = Math.round(p.maxHp * (1 + m.hpMul)); }
+      p.hp = p.maxHp;
+      if (m.dmgMul) p.dmgMul += m.dmgMul;
+      if (m.crit) p.crit += m.crit;
+      if (m.speedMul) p.speedMul += m.speedMul;
+      if (m.pickupMul) p.pickupMul += m.pickupMul;
+      if (m.fireRateMul) p.fireRateMul *= m.fireRateMul;
+      if (m.areaMul) p.areaMul += m.areaMul;
+      if (m.xpMul) p.xpMul += m.xpMul;
+      if (m.regen) p.regen += m.regen;
+
       this.recalc();
       Sound.startMusic(0);
       this.updateHUD();
@@ -378,10 +478,18 @@
       const p = this.player;
       Meta.data.runs++;
       Meta.data.coins += this.runCoins;
+      Meta.data.totalKills = (Meta.data.totalKills || 0) + this.kills;
       if (record) {
         if (p.level > Meta.data.best) Meta.data.best = p.level;
         if (this.time > Meta.data.bestTime) Meta.data.bestTime = this.time;
       }
+      // milestone-based character unlocks
+      this._newUnlocks = [];
+      CHARACTERS.forEach(c => {
+        if (Meta.hasChar(c.id)) return;
+        if (c.unlock.type === 'level' && p.level >= c.unlock.amt) { Meta.data.chars[c.id] = 1; this._newUnlocks.push(c); }
+        if (c.unlock.type === 'time' && this.time >= c.unlock.amt) { Meta.data.chars[c.id] = 1; this._newUnlocks.push(c); }
+      });
       Meta.save();
     },
 
@@ -882,9 +990,14 @@
       const el = document.getElementById('gameover');
       el.classList.remove('hidden');
       document.getElementById('go-title').textContent = 'YOU DIED';
-      document.getElementById('go-stats').innerHTML =
-        `Level <b>${this.player.level}</b> · Survived <b>${fmtTime(this.time)}</b><br>` +
+      let html = `Level <b>${this.player.level}</b> · Survived <b>${fmtTime(this.time)}</b><br>` +
         `Kills <b>${this.kills}</b> · Earned <b style="color:var(--gold)">◈ ${this.runCoins}</b>`;
+      if (this._newUnlocks && this._newUnlocks.length) {
+        html += '<br><br><span style="color:var(--neon2);font-weight:800">★ PILOT UNLOCKED</span><br>' +
+          this._newUnlocks.map(c => `${c.ic} ${c.nm}`).join(' · ');
+        Sound.evolve();
+      }
+      document.getElementById('go-stats').innerHTML = html;
     },
 
     // ---- pickups: gems + coins ----
@@ -1112,7 +1225,7 @@
       ctx.fillStyle = '#05060f';
       ctx.fillRect(0, 0, this.W, this.H);
 
-      if (this.state === 'menu' || this.state === 'shop' || this.state === 'howto') {
+      if (this.state === 'menu' || this.state === 'shop' || this.state === 'howto' || this.state === 'charselect') {
         this.renderMenuBg();
         return;
       }

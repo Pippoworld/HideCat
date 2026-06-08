@@ -15,8 +15,10 @@ const { chromium } = require(gpath + '/playwright');
   await page.goto(url);
   await page.waitForTimeout(300);
 
-  // Start a run
+  // Start a run (Play -> pick first pilot)
   await page.click('#play-btn');
+  await page.waitForTimeout(120);
+  await page.click('#char-grid .char-card');
   await page.waitForTimeout(200);
 
   // Probe game state

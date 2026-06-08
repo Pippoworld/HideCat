@@ -8,7 +8,7 @@ const { chromium } = require(gpath + '/playwright');
   page.on('pageerror', e => errors.push(e.message));
   await page.goto('file://' + path.resolve(__dirname, 'index.html'));
   await page.waitForTimeout(150);
-  await page.click('#play-btn');
+  await page.click('#play-btn'); await page.waitForTimeout(100); await page.click('#char-grid .char-card');
   await page.waitForTimeout(100);
 
   const r = await page.evaluate(() => {

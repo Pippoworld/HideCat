@@ -12,7 +12,7 @@ const { chromium } = require(gpath + '/playwright');
   let i = 0;
   if (shots.includes('menu')) { await page.screenshot({ path: `shot-menu.png` }); }
   if (shots.includes('play')) {
-    await page.click('#play-btn');
+    await page.click('#play-btn'); await page.waitForTimeout(100); await page.click('#char-grid .char-card');
     const secs = parseInt(process.env.PLAYSECS || '12');
     const seq = ['KeyD', 'KeyS', 'KeyA', 'KeyW']; // circle
     let cur = null;

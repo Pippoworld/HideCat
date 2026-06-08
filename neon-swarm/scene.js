@@ -7,7 +7,7 @@ const { chromium } = require(gpath + '/playwright');
   page.on('pageerror', e => console.log('ERR', e.message));
   await page.goto('file://' + path.resolve(__dirname, 'index.html'));
   await page.waitForTimeout(200);
-  await page.click('#play-btn');
+  await page.click('#play-btn'); await page.waitForTimeout(100); await page.click('#char-grid .char-card');
   await page.waitForTimeout(100);
   await page.evaluate(async () => {
     const G = window.Game;
