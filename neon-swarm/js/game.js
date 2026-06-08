@@ -288,6 +288,10 @@
       Input.init(this.canvas);
       this.resize();
       window.addEventListener('resize', () => this.resize());
+      // auto-pause when the tab is hidden so players don't die while away
+      document.addEventListener('visibilitychange', () => {
+        if (document.hidden && this.state === 'playing') this.togglePause();
+      });
       this.wireUI();
       this.showMenu();
       requestAnimationFrame((t) => this.loop(t));
@@ -478,6 +482,9 @@
       this.recalc();
       Sound.startMusic(0);
       if (window.Ads) Ads.gameplayStart();
+      // first-time onboarding hint
+      this._hintLife = Meta.data.seenTutorial ? 0 : 4.5;
+      if (!Meta.data.seenTutorial) { Meta.data.seenTutorial = 1; Meta.save(); }
       this.updateHUD();
     },
 
@@ -598,6 +605,11 @@
           p.facing = Math.atan2(mv.y, mv.x);
           this._heading = p.facing;
           this._moving = true;
+          // thruster particles behind the ship
+          if (Math.random() < 0.7) {
+            const bx = p.x - Math.cos(p.facing) * 14, by = p.y - Math.sin(p.facing) * 14;
+            this.particles.push({ kind: 'spark', x: bx, y: by, vx: -Math.cos(p.facing) * 70 + rand(-25, 25), vy: -Math.sin(p.facing) * 70 + rand(-25, 25), color: '#18e0ff', life: 0.3, maxLife: 0.3, r: rand(1.5, 3) });
+          }
         } else this._moving = false;
       }
 
@@ -1517,6 +1529,24 @@
         ctx.restore();
       }
 
+      // off-screen boss indicators (screen space)
+      this.drawBossIndicators(ctx);
+
+      // first-run onboarding hint
+      if (this._hintLife > 0) {
+        this._hintLife -= 0.016;
+        ctx.save();
+        ctx.globalAlpha = clamp(this._hintLife, 0, 1) * 0.9;
+        ctx.textAlign = 'center';
+        ctx.fillStyle = '#cfe9ff';
+        ctx.font = '700 18px system-ui, sans-serif';
+        ctx.fillText('MOVE to dodge — your weapons fire automatically', this.W / 2, this.H * 0.62);
+        ctx.font = '600 14px system-ui, sans-serif';
+        ctx.fillStyle = '#8fa8cc';
+        ctx.fillText('Collect XP to level up and grow your arsenal', this.W / 2, this.H * 0.62 + 26);
+        ctx.restore();
+      }
+
       // joystick (screen space)
       this.drawJoystick(ctx);
 
@@ -1648,6 +1678,27 @@
       }
       ctx.globalAlpha = 1;
       ctx.globalCompositeOperation = 'source-over';
+    },
+
+    drawBossIndicators(ctx) {
+      const margin = 36;
+      for (const e of this.enemies) {
+        if (!e.boss) continue;
+        const sx = e.x - this.cam.x, sy = e.y - this.cam.y;
+        if (sx >= 0 && sx <= this.W && sy >= 0 && sy <= this.H) continue; // on screen
+        const cx = clamp(sx, margin, this.W - margin);
+        const cy = clamp(sy, margin, this.H - margin);
+        const ang = Math.atan2(sy - this.H / 2, sx - this.W / 2);
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.rotate(ang);
+        ctx.fillStyle = '#ff2bd6';
+        ctx.shadowColor = '#ff2bd6'; ctx.shadowBlur = 12;
+        ctx.beginPath();
+        ctx.moveTo(14, 0); ctx.lineTo(-8, -9); ctx.lineTo(-8, 9); ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+      }
     },
 
     drawJoystick(ctx) {
