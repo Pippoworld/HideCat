@@ -566,8 +566,20 @@
       this.state = 'awards';
       this.hideAll();
       document.getElementById('awards').classList.remove('hidden');
+      // best-runs leaderboard
+      const sc = document.getElementById('awards-scores');
+      const scores = Meta.data.scores || [];
+      if (scores.length) {
+        sc.innerHTML = '<div class="lb-title">🏆 BEST RUNS</div>' + scores.map((s, i) => {
+          const ch = charById(s.char);
+          return `<div class="lb-row"><span class="rk">${i + 1}</span><span class="sc">${s.score.toLocaleString()}</span>` +
+            `<span class="meta">${ch.ic} Lv ${s.level} · ${fmtTime(s.time)}</span></div>`;
+        }).join('');
+      } else {
+        sc.innerHTML = '<div class="lb-title">🏆 BEST RUNS</div><div class="lb-row"><span class="meta">No runs yet — play to set a score!</span></div>';
+      }
       const got = ACHIEVEMENTS.filter(a => Meta.data.achievements[a.id]).length;
-      document.getElementById('awards-progress').textContent = `${got} / ${ACHIEVEMENTS.length} unlocked`;
+      document.getElementById('awards-progress').textContent = `${got} / ${ACHIEVEMENTS.length} achievements`;
       const grid = document.getElementById('awards-grid');
       grid.innerHTML = '';
       ACHIEVEMENTS.forEach(a => {
