@@ -1236,6 +1236,7 @@
         if (bonus > 0) this.gainXP(bonus);
       }
       if (this.coins.length > 80) this.coins.splice(0, this.coins.length - 80);
+      if (this.pickups.length > 16) this.pickups.splice(0, this.pickups.length - 16);
       // gems: hard-pull within pickup radius, soft-drift within a wider radius so
       // kited XP is never permanently lost.
       const soft2 = (pr * 2.4) * (pr * 2.4);
