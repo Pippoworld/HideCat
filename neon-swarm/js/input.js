@@ -23,6 +23,9 @@
       window.addEventListener('keyup', (e) => { this.keys[e.code] = false; });
       window.addEventListener('blur', () => { this.keys = {}; });
 
+      // suppress long-press context menu on the play surface
+      canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+
       // Pointer (covers mouse + touch)
       canvas.addEventListener('pointerdown', (e) => this._down(e), { passive: false });
       canvas.addEventListener('pointermove', (e) => this._move(e), { passive: false });
@@ -31,6 +34,8 @@
     },
 
     _down(e) {
+      // iOS/Safari unlock audio on the first touch on the play surface
+      if (window.Sound) Sound.resume();
       if (this._pointerId !== null) return;
       this._pointerId = e.pointerId;
       this.touchActive = true;

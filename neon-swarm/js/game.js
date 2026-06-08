@@ -64,14 +64,19 @@
     data: { coins: 0, best: 0, bestTime: 0, runs: 0, totalKills: 0, bossKills: 0, coinsEarned: 0, upgrades: {}, chars: { vanguard: 1 }, achievements: {}, muted: 0, lastChar: 'vanguard', scores: [], difficulty: 'normal',
       settings: { music: 100, sfx: 100, shake: 1, dmg: 1, lowq: 0 }, daily: { seed: 0, best: 0, plays: 0 } },
     load() {
-      try {
-        const s = JSON.parse(localStorage.getItem(SAVE_KEY));
-        if (s) this.data = Object.assign(this.data, s);
-        if (!this.data.upgrades) this.data.upgrades = {};
-        if (!this.data.chars) this.data.chars = { vanguard: 1 };
-        if (!this.data.achievements) this.data.achievements = {};
-        if (!this.data.settings) this.data.settings = { music: 100, sfx: 100, shake: 1, dmg: 1, lowq: 0 };
-      } catch (e) {}
+      let s = null;
+      try { s = JSON.parse(localStorage.getItem(SAVE_KEY)); } catch (e) { s = null; }
+      if (!s || typeof s !== 'object') return; // corrupt/missing -> keep full defaults
+      const def = this.data;
+      this.data = Object.assign({}, def, s);
+      // ensure nested structures always have current default keys
+      this.data.upgrades = Object.assign({}, s.upgrades || {});
+      this.data.chars = Object.assign({ vanguard: 1 }, s.chars || {});
+      this.data.achievements = Object.assign({}, s.achievements || {});
+      this.data.settings = Object.assign({}, def.settings, s.settings || {});
+      this.data.daily = Object.assign({}, def.daily, s.daily || {});
+      if (!Array.isArray(this.data.scores)) this.data.scores = [];
+      this.data.version = 1;
     },
     save() {
       try { localStorage.setItem(SAVE_KEY, JSON.stringify(this.data)); } catch (e) {}
