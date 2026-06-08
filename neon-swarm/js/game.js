@@ -20,7 +20,8 @@
   // ---------------------------------------------------------------- meta save
   const SAVE_KEY = 'neonswarm_save_v1';
   const Meta = {
-    data: { coins: 0, best: 0, bestTime: 0, runs: 0, totalKills: 0, bossKills: 0, coinsEarned: 0, upgrades: {}, chars: { vanguard: 1 }, achievements: {}, muted: 0, lastChar: 'vanguard', scores: [], difficulty: 'normal' },
+    data: { coins: 0, best: 0, bestTime: 0, runs: 0, totalKills: 0, bossKills: 0, coinsEarned: 0, upgrades: {}, chars: { vanguard: 1 }, achievements: {}, muted: 0, lastChar: 'vanguard', scores: [], difficulty: 'normal',
+      settings: { music: 100, sfx: 100, shake: 1, dmg: 1, lowq: 0 } },
     load() {
       try {
         const s = JSON.parse(localStorage.getItem(SAVE_KEY));
@@ -28,6 +29,7 @@
         if (!this.data.upgrades) this.data.upgrades = {};
         if (!this.data.chars) this.data.chars = { vanguard: 1 };
         if (!this.data.achievements) this.data.achievements = {};
+        if (!this.data.settings) this.data.settings = { music: 100, sfx: 100, shake: 1, dmg: 1, lowq: 0 };
       } catch (e) {}
     },
     save() {
@@ -358,6 +360,9 @@
       $('menu-btn').onclick = async () => { if (window.Ads) await Ads.interstitial(); this.showMenu(); };
       $('continue-btn').onclick = () => this.continueRun();
       $('share-btn').onclick = () => this.shareScore();
+      $('settings-btn').onclick = () => this.showSettings();
+      $('settings-back').onclick = () => this.showMenu();
+      this.applySettings();
       $('lu-reroll').onclick = () => this.reroll();
       const mute = $('mute-btn');
       Sound.setMuted(!!Meta.data.muted);
@@ -442,7 +447,7 @@
     },
 
     hideAll() {
-      ['menu', 'levelup', 'pause', 'gameover', 'shop', 'howto', 'charselect', 'awards'].forEach(id => document.getElementById(id).classList.add('hidden'));
+      ['menu', 'levelup', 'pause', 'gameover', 'shop', 'howto', 'charselect', 'awards', 'settings'].forEach(id => document.getElementById(id).classList.add('hidden'));
       document.getElementById('hud').classList.add('hidden');
     },
 
@@ -462,6 +467,36 @@
       this.hideAll();
       document.getElementById('shop').classList.remove('hidden');
       this.renderShop();
+    },
+
+    applySettings() {
+      const s = Meta.data.settings;
+      Sound.musicVol = 0.32 * (s.music / 100);
+      Sound.sfxVol = 0.6 * (s.sfx / 100);
+      Sound.setMusicVol(Sound.musicVol);
+      Sound.setSfxVol(Sound.sfxVol);
+    },
+
+    showSettings() {
+      this.state = 'settings';
+      this.hideAll();
+      document.getElementById('settings').classList.remove('hidden');
+      const s = Meta.data.settings;
+      const $ = (id) => document.getElementById(id);
+      $('set-music').value = s.music; $('set-sfx').value = s.sfx;
+      $('set-shake').checked = !!s.shake; $('set-dmg').checked = !!s.dmg; $('set-lowq').checked = !!s.lowq;
+      const save = () => { Meta.save(); this.applySettings(); };
+      $('set-music').oninput = (e) => { s.music = +e.target.value; save(); };
+      $('set-sfx').oninput = (e) => { s.sfx = +e.target.value; Sound.select(); save(); };
+      $('set-shake').onchange = (e) => { s.shake = e.target.checked ? 1 : 0; save(); };
+      $('set-dmg').onchange = (e) => { s.dmg = e.target.checked ? 1 : 0; save(); };
+      $('set-lowq').onchange = (e) => { s.lowq = e.target.checked ? 1 : 0; save(); };
+      $('set-reset').onclick = () => {
+        if (confirm('Erase ALL progress, coins, unlocks and scores? This cannot be undone.')) {
+          try { localStorage.removeItem(SAVE_KEY); } catch (e) {}
+          location.reload();
+        }
+      };
     },
 
     showAwards() {
@@ -1552,6 +1587,7 @@
 
     // ---- particles & text & banner ----
     spawnParticles(x, y, color, n) {
+      if (Meta.data.settings.lowq) n = Math.ceil(n * 0.4);
       for (let i = 0; i < n; i++) {
         const a = rand(0, TAU), s = rand(40, 200);
         this.particles.push({ kind: 'spark', x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, color, life: rand(0.2, 0.5), maxLife: 0.5, r: rand(1.5, 3.5) });
@@ -1569,6 +1605,7 @@
     },
 
     spawnDmgText(x, y, val, crit, color) {
+      if (!Meta.data.settings.dmg && !crit) return;
       this.dmgTexts.push({ x: x + rand(-6, 6), y, val, crit, color: crit ? '#ffd84d' : '#fff', life: 0.6, vy: -50 });
     },
 
@@ -1602,7 +1639,7 @@
     _banner: null,
     banner(text) { this._banner = { text, life: 1.8 }; },
 
-    shake(amt) { this.shakeAmt = Math.min(20, this.shakeAmt + amt); },
+    shake(amt) { if (Meta.data.settings.shake) this.shakeAmt = Math.min(20, this.shakeAmt + amt); },
 
     // ---------------------------------------------------------------- RENDER
     render() {
@@ -1610,7 +1647,7 @@
       ctx.fillStyle = '#05060f';
       ctx.fillRect(0, 0, this.W, this.H);
 
-      if (this.state === 'menu' || this.state === 'shop' || this.state === 'howto' || this.state === 'charselect' || this.state === 'awards') {
+      if (this.state === 'menu' || this.state === 'shop' || this.state === 'howto' || this.state === 'charselect' || this.state === 'awards' || this.state === 'settings') {
         this.renderMenuBg();
         return;
       }

@@ -23,11 +23,11 @@
         this.master.connect(this.ctx.destination);
 
         this.musicGain = this.ctx.createGain();
-        this.musicGain.gain.value = 0.32;
+        this.musicGain.gain.value = this.musicVol;
         this.musicGain.connect(this.master);
 
         this.sfxGain = this.ctx.createGain();
-        this.sfxGain.gain.value = 0.6;
+        this.sfxGain.gain.value = this.sfxVol;
         this.sfxGain.connect(this.master);
       } catch (e) {
         this.enabled = false;
@@ -38,9 +38,22 @@
       if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume();
     },
 
+    musicVol: 0.32,
+    sfxVol: 0.6,
+
     setMuted(m) {
       this.muted = m;
       if (this.master) this.master.gain.value = m ? 0 : 0.9;
+    },
+
+    setMusicVol(v) {
+      this.musicVol = v;
+      if (this.musicGain) this.musicGain.gain.value = v;
+    },
+
+    setSfxVol(v) {
+      this.sfxVol = v;
+      if (this.sfxGain) this.sfxGain.gain.value = v;
     },
 
     _now() { return this.ctx.currentTime; },

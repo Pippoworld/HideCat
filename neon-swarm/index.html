@@ -47,6 +47,21 @@
     <div id="best-line"></div>
     <p class="credit">A neon roguelite • move with WASD / drag • auto-fire</p>
     <button id="mute-btn" class="icon-btn" aria-label="Toggle sound">🔊</button>
+    <button id="settings-btn" class="icon-btn" style="right:64px" aria-label="Settings">⚙</button>
+  </div>
+
+  <!-- Settings -->
+  <div id="settings" class="overlay hidden">
+    <h2>SETTINGS</h2>
+    <div class="settings-list">
+      <label class="set-row"><span>Music</span><input id="set-music" type="range" min="0" max="100" value="100"></label>
+      <label class="set-row"><span>Sound FX</span><input id="set-sfx" type="range" min="0" max="100" value="100"></label>
+      <label class="set-row"><span>Screen shake</span><input id="set-shake" type="checkbox" checked></label>
+      <label class="set-row"><span>Damage numbers</span><input id="set-dmg" type="checkbox" checked></label>
+      <label class="set-row"><span>Low quality (faster)</span><input id="set-lowq" type="checkbox"></label>
+    </div>
+    <button id="set-reset" class="btn small" style="border-color:var(--bad);color:var(--bad)">RESET ALL PROGRESS</button>
+    <button id="settings-back" class="btn">BACK</button>
   </div>
 
   <!-- Character select -->

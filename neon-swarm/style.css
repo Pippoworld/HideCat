@@ -262,6 +262,16 @@ html, body {
 }
 .diff-arrow:active { transform: scale(0.92); }
 
+/* ---------- Settings ---------- */
+.settings-list { display: flex; flex-direction: column; gap: 14px; width: min(380px, 86vw); }
+.set-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  background: var(--panel); border: 1px solid rgba(24,224,255,0.2);
+  border-radius: 10px; padding: 12px 16px; font-weight: 700; color: #cfe9ff; font-size: 15px;
+}
+.set-row input[type=range] { width: 150px; accent-color: var(--neon); }
+.set-row input[type=checkbox] { width: 22px; height: 22px; accent-color: var(--neon); }
+
 .icon-btn {
   position: absolute; top: 14px; right: 14px;
   width: 44px; height: 44px; font-size: 20px;
