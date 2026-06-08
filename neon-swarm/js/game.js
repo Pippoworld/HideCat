@@ -589,7 +589,12 @@
         sc.innerHTML = '<div class="lb-title">🏆 BEST RUNS</div><div class="lb-row"><span class="meta">No runs yet — play to set a score!</span></div>';
       }
       const got = ACHIEVEMENTS.filter(a => Meta.data.achievements[a.id]).length;
-      document.getElementById('awards-progress').textContent = `${got} / ${ACHIEVEMENTS.length} achievements`;
+      const mins = Math.floor((Meta.data.playSeconds || 0) / 60);
+      const playStr = mins >= 60 ? `${Math.floor(mins / 60)}h ${mins % 60}m` : `${mins}m`;
+      document.getElementById('awards-progress').innerHTML =
+        `${got} / ${ACHIEVEMENTS.length} achievements` +
+        `<div style="color:#8fa8cc;font-size:12px;font-weight:600;margin-top:4px">` +
+        `${Meta.data.runs || 0} runs · ${(Meta.data.totalKills || 0).toLocaleString()} kills · ${Meta.data.bossKills || 0} bosses · ${playStr} played</div>`;
       const grid = document.getElementById('awards-grid');
       grid.innerHTML = '';
       ACHIEVEMENTS.forEach(a => {
@@ -718,6 +723,7 @@
       Meta.data.coins += this.runCoins;
       Meta.data.coinsEarned = (Meta.data.coinsEarned || 0) + this.runCoins;
       Meta.data.totalKills = (Meta.data.totalKills || 0) + this.kills;
+      Meta.data.playSeconds = (Meta.data.playSeconds || 0) + Math.floor(this.time);
       // final score = combat score + survival/level/coin bonuses
       this.finalScore = Math.round(((this.score || 0) + Math.floor(this.time) * 8 + p.level * 200 + this.runCoins * 2) * (this.diff ? this.diff.score : 1));
       this.scoreRank = -1;
