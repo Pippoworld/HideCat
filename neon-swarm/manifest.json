@@ -1,0 +1,19 @@
+{
+  "name": "NEON SWARM",
+  "short_name": "NEON SWARM",
+  "description": "A fast, addictive survivors-style roguelite. Dodge the swarm, level up, build a deadly weapon combo and survive.",
+  "start_url": "./index.html",
+  "display": "fullscreen",
+  "orientation": "any",
+  "background_color": "#05060f",
+  "theme_color": "#05060f",
+  "categories": ["games", "entertainment"],
+  "icons": [
+    {
+      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='96' fill='%2305060f'/%3E%3Cpolygon points='256,96 368,416 256,336 144,416' fill='%2318e0ff'/%3E%3C/svg%3E",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

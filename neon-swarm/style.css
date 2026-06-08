@@ -86,6 +86,13 @@ html, body {
 }
 .btn.primary:hover { box-shadow: 0 0 34px rgba(24,224,255,0.75); }
 .btn.small { font-size: 14px; padding: 10px 16px; }
+.btn.revive {
+  color: #02140a;
+  background: linear-gradient(180deg, #6dffb0, #2fd683);
+  border-color: #b6ffd9;
+  box-shadow: 0 0 22px rgba(77,255,158,0.45);
+}
+.btn.revive small { font-weight: 700; opacity: 0.75; }
 
 #best-line { color: var(--gold); font-weight: 700; min-height: 22px; text-shadow: 0 0 10px rgba(255,216,77,0.5); }
 

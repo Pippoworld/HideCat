@@ -284,6 +284,7 @@
       this.canvas = document.getElementById('game');
       this.ctx = this.canvas.getContext('2d');
       Meta.load();
+      if (window.Ads) Ads.init();
       Input.init(this.canvas);
       this.resize();
       window.addEventListener('resize', () => this.resize());
@@ -315,9 +316,10 @@
       $('char-back').onclick = () => this.showMenu();
       $('pause-btn').onclick = () => this.togglePause();
       $('resume-btn').onclick = () => this.togglePause();
-      $('quit-btn').onclick = () => { this.endRun(false); this.showMenu(); };
-      $('retry-btn').onclick = () => this.startRun(this.charId);
-      $('menu-btn').onclick = () => this.showMenu();
+      $('quit-btn').onclick = () => { if (window.Ads) Ads.gameplayStop(); this.endRun(false); this.showMenu(); };
+      $('retry-btn').onclick = async () => { if (window.Ads) await Ads.interstitial(); this.startRun(this.charId); };
+      $('menu-btn').onclick = async () => { if (window.Ads) await Ads.interstitial(); this.showMenu(); };
+      $('continue-btn').onclick = () => this.continueRun();
       $('lu-reroll').onclick = () => this.reroll();
       const mute = $('mute-btn');
       Sound.setMuted(!!Meta.data.muted);
@@ -441,6 +443,7 @@
       this.spawnAcc = 0; this.shakeAmt = 0;
       this.bossSpawned = {};
       this.pendingLevels = 0;
+      this._usedContinue = false;
       this.paused = false;
 
       // apply meta upgrades
@@ -471,6 +474,7 @@
 
       this.recalc();
       Sound.startMusic(0);
+      if (window.Ads) Ads.gameplayStart();
       this.updateHUD();
     },
 
@@ -515,10 +519,12 @@
         document.getElementById('pause').classList.remove('hidden');
         this.renderPauseBuild();
         Sound.stopMusic();
+        if (window.Ads) Ads.gameplayStop();
       } else if (this.state === 'pause') {
         this.state = 'playing'; this.paused = false;
         document.getElementById('pause').classList.add('hidden');
         Sound.startMusic(0);
+        if (window.Ads) Ads.gameplayStart();
       }
     },
 
@@ -1017,9 +1023,27 @@
         return;
       }
       this.state = 'gameover';
+      if (window.Ads) Ads.gameplayStop();
       this.endRun(true);
       Sound.gameover();
       this.showGameOver();
+    },
+
+    async continueRun() {
+      if (this._usedContinue) return;
+      const ok = window.Ads ? await Ads.rewarded('continue') : true;
+      if (!ok) return;
+      this._usedContinue = true;
+      this.hideAll();
+      document.getElementById('hud').classList.remove('hidden');
+      const p = this.player;
+      p.hp = p.maxHp; p.invuln = 3;
+      this.spawnZone(p.x, p.y, 620, 9999, '#ffd84d'); // clear breathing room
+      this.shake(14);
+      this.state = 'playing';
+      if (window.Ads) Ads.gameplayStart();
+      Sound.startMusic(0);
+      this.banner('↺ BACK IN!');
     },
 
     showGameOver() {
@@ -1035,6 +1059,8 @@
         Sound.evolve();
       }
       document.getElementById('go-stats').innerHTML = html;
+      const cont = document.getElementById('continue-btn');
+      if (cont) cont.classList.toggle('hidden', this._usedContinue);
     },
 
     // ---- pickups: gems + coins ----
