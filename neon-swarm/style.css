@@ -127,6 +127,7 @@ html, body {
   text-shadow: 0 1px 3px #000;
 }
 #timer { color: #fff; }
+#score { color: var(--neon); font-weight: 900; }
 #kills { color: var(--bad); }
 #coins { color: var(--gold); }
 

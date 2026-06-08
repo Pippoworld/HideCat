@@ -20,7 +20,7 @@
   // ---------------------------------------------------------------- meta save
   const SAVE_KEY = 'neonswarm_save_v1';
   const Meta = {
-    data: { coins: 0, best: 0, bestTime: 0, runs: 0, totalKills: 0, upgrades: {}, chars: { vanguard: 1 }, muted: 0, lastChar: 'vanguard' },
+    data: { coins: 0, best: 0, bestTime: 0, runs: 0, totalKills: 0, upgrades: {}, chars: { vanguard: 1 }, muted: 0, lastChar: 'vanguard', scores: [] },
     load() {
       try {
         const s = JSON.parse(localStorage.getItem(SAVE_KEY));
@@ -383,8 +383,10 @@
       Sound.stopMusic();
       this.hideAll();
       document.getElementById('menu').classList.remove('hidden');
-      const best = Meta.data.best;
-      document.getElementById('best-line').textContent = best ? `Best: Level ${best} · ${fmtTime(Meta.data.bestTime)}` : '';
+      const top = (Meta.data.scores && Meta.data.scores[0]) ? Meta.data.scores[0] : null;
+      document.getElementById('best-line').textContent = top
+        ? `🏆 Best: ${top.score.toLocaleString()}  ·  Lv ${top.level} · ${fmtTime(top.time)}`
+        : (Meta.data.best ? `Best: Level ${Meta.data.best}` : '');
     },
 
     showShop() {
@@ -436,6 +438,7 @@
       this.particles = []; this.dmgTexts = []; this.zones = []; this.orbiters = []; this.booms = []; this.pickups = [];
       this.cam = { x: 0, y: 0, shake: 0 };
       this.time = 0; this.kills = 0; this.runCoins = 0;
+      this.score = 0; this.combo = 0; this.comboTimer = 0; this.bestCombo = 0;
       this.weapons = {}; this.weapons[ch.weapon] = 1;
       this.passives = {};
       this.evolved = {};
@@ -484,9 +487,18 @@
       Meta.data.runs++;
       Meta.data.coins += this.runCoins;
       Meta.data.totalKills = (Meta.data.totalKills || 0) + this.kills;
+      // final score = combat score + survival/level/coin bonuses
+      this.finalScore = (this.score || 0) + Math.floor(this.time) * 8 + p.level * 200 + this.runCoins * 2;
+      this.scoreRank = -1;
       if (record) {
         if (p.level > Meta.data.best) Meta.data.best = p.level;
         if (this.time > Meta.data.bestTime) Meta.data.bestTime = this.time;
+        if (!Meta.data.scores) Meta.data.scores = [];
+        const entry = { score: this.finalScore, level: p.level, time: Math.floor(this.time), char: this.charId, combo: this.bestCombo, date: Date.now() };
+        Meta.data.scores.push(entry);
+        Meta.data.scores.sort((a, b) => b.score - a.score);
+        Meta.data.scores = Meta.data.scores.slice(0, 5);
+        this.scoreRank = Meta.data.scores.indexOf(entry);
       }
       // milestone-based character unlocks
       this._newUnlocks = [];
@@ -504,6 +516,7 @@
       this.areaMul = this.player.areaMul;
     },
 
+    comboMult() { return 1 + Math.min(this.combo, 50) * 0.03; }, // up to 2.5x
     weaponLevel(id) { return (this.weapons[id] || 1) - 1; }, // 0-indexed for stat()
     isEvolved(id) { return !!(this.evolved && this.evolved[id]); },
     isEvolveReady(id) {
@@ -587,6 +600,9 @@
           this._moving = true;
         } else this._moving = false;
       }
+
+      // combo decay
+      if (this.comboTimer > 0) { this.comboTimer -= dt; if (this.comboTimer <= 0) this.combo = 0; }
 
       // regen + timers
       if (p.regen > 0 && p.hp < p.maxHp) p.hp = Math.min(p.maxHp, p.hp + p.regen * dt);
@@ -978,6 +994,10 @@
       if (!e) return;
       this.enemies.splice(idx, 1);
       this.kills++;
+      // combo + score
+      this.combo++; this.comboTimer = 2.5;
+      if (this.combo > this.bestCombo) this.bestCombo = this.combo;
+      this.score += Math.round((e.xp * 10 + (e.boss ? 2000 : 0)) * this.comboMult());
       this.spawnParticles(e.x, e.y, e.color, e.boss ? 30 : 7);
       Sound.kill();
       if (e.boss) { this.shake(10); this.banner('BOSS DOWN!'); }
@@ -1051,8 +1071,12 @@
       const el = document.getElementById('gameover');
       el.classList.remove('hidden');
       document.getElementById('go-title').textContent = 'YOU DIED';
-      let html = `Level <b>${this.player.level}</b> · Survived <b>${fmtTime(this.time)}</b><br>` +
-        `Kills <b>${this.kills}</b> · Earned <b style="color:var(--gold)">◈ ${this.runCoins}</b>`;
+      let html = `<div style="font-size:13px;color:#8fa8cc;letter-spacing:2px">SCORE</div>` +
+        `<div style="font-size:40px;font-weight:900;color:var(--neon);text-shadow:0 0 16px rgba(24,224,255,0.5);line-height:1.1">${(this.finalScore || 0).toLocaleString()}</div>`;
+      if (this.scoreRank === 0) html += `<div style="color:var(--gold);font-weight:800;margin:4px 0">★ NEW HIGH SCORE!</div>`;
+      else if (this.scoreRank > 0) html += `<div style="color:var(--neon2);margin:4px 0">Top ${this.scoreRank + 1} run</div>`;
+      html += `<div style="margin-top:8px">Level <b>${this.player.level}</b> · Survived <b>${fmtTime(this.time)}</b><br>` +
+        `Kills <b>${this.kills}</b> · Best Combo <b>${this.bestCombo}x</b> · <b style="color:var(--gold)">◈ ${this.runCoins}</b></div>`;
       if (this._newUnlocks && this._newUnlocks.length) {
         html += '<br><br><span style="color:var(--neon2);font-weight:800">★ PILOT UNLOCKED</span><br>' +
           this._newUnlocks.map(c => `${c.ic} ${c.nm}`).join(' · ');
@@ -1475,6 +1499,24 @@
       // low-HP danger vignette (screen space)
       this.drawDangerVignette(ctx);
 
+      // combo meter (screen space)
+      if (this.combo >= 5) {
+        const mult = this.comboMult();
+        const t = clamp(this.comboTimer / 2.5, 0, 1);
+        ctx.save();
+        ctx.textAlign = 'center';
+        ctx.globalAlpha = 0.5 + 0.5 * t;
+        ctx.fillStyle = mult >= 2 ? '#ff2bd6' : '#ffd84d';
+        const sz = 22 + Math.min(this.combo, 50) * 0.5;
+        ctx.font = `900 ${sz}px system-ui, sans-serif`;
+        ctx.fillText(`${this.combo}x  ${mult.toFixed(1)}×`, this.W / 2, 78);
+        // timer bar
+        ctx.globalAlpha = 0.6;
+        ctx.fillStyle = ctx.fillStyle;
+        ctx.fillRect(this.W / 2 - 50, 86, 100 * t, 3);
+        ctx.restore();
+      }
+
       // joystick (screen space)
       this.drawJoystick(ctx);
 
@@ -1640,6 +1682,7 @@
       document.getElementById('hp-fill').style.width = clamp(p.hp / p.maxHp * 100, 0, 100) + '%';
       document.getElementById('hp-text').textContent = Math.ceil(p.hp) + ' / ' + p.maxHp;
       document.getElementById('timer').textContent = fmtTime(this.time);
+      document.getElementById('score').textContent = (this.score || 0).toLocaleString();
       document.getElementById('kills').textContent = '☠ ' + this.kills;
       document.getElementById('coins').textContent = '◈ ' + this.runCoins;
     },
