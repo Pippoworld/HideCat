@@ -357,6 +357,7 @@
       $('retry-btn').onclick = async () => { if (window.Ads) await Ads.interstitial(); this.startRun(this.charId); };
       $('menu-btn').onclick = async () => { if (window.Ads) await Ads.interstitial(); this.showMenu(); };
       $('continue-btn').onclick = () => this.continueRun();
+      $('share-btn').onclick = () => this.shareScore();
       $('lu-reroll').onclick = () => this.reroll();
       const mute = $('mute-btn');
       Sound.setMuted(!!Meta.data.muted);
@@ -1222,6 +1223,23 @@
       this.showGameOver();
     },
 
+    shareScore() {
+      const d = this.diff ? this.diff.nm : 'NORMAL';
+      const text = `I scored ${(this.finalScore || 0).toLocaleString()} in NEON SWARM (${d})! ` +
+        `Level ${this.player.level}, survived ${fmtTime(this.time)}. Can you beat it?`;
+      const url = location.href.split('#')[0];
+      const btn = document.getElementById('share-btn');
+      const flash = (msg) => { if (btn) { const o = btn.textContent; btn.textContent = msg; setTimeout(() => { btn.textContent = o; }, 1600); } };
+      if (navigator.share) {
+        navigator.share({ title: 'NEON SWARM', text, url }).catch(() => {});
+      } else if (navigator.clipboard) {
+        navigator.clipboard.writeText(text + ' ' + url).then(() => flash('✓ COPIED!')).catch(() => flash('—'));
+      } else {
+        flash('—');
+      }
+      Sound.select();
+    },
+
     async continueRun() {
       if (this._usedContinue) return;
       const ok = window.Ads ? await Ads.rewarded('continue') : true;
@@ -1696,6 +1714,15 @@
       ctx.globalAlpha = 1;
 
       ctx.restore();
+
+      // intensity tint: arena slowly warms toward danger-red as the run escalates
+      const intensity = clamp(this.time / 360, 0, 1);
+      if (intensity > 0.01) {
+        ctx.globalCompositeOperation = 'overlay';
+        ctx.fillStyle = `rgba(${Math.round(120 * intensity)},${Math.round(20 * intensity)},${Math.round(60 * intensity)},${0.10 * intensity})`;
+        ctx.fillRect(0, 0, this.W, this.H);
+        ctx.globalCompositeOperation = 'source-over';
+      }
 
       // low-HP danger vignette (screen space)
       this.drawDangerVignette(ctx);
