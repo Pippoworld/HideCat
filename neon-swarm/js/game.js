@@ -410,15 +410,17 @@
       this.cam.y = lerp(this.cam.y, p.y - this.H / 2, 0.12);
       if (this.shakeAmt > 0) this.shakeAmt = Math.max(0, this.shakeAmt - dt * 40);
 
-      // weapons
+      // spawning + enemy movement first, then build spatial grid for fast queries
+      this.updateSpawning(dt);
+      this.updateEnemies(dt);
+      this.buildGrid();
+      this.separateEnemies();
+
+      // weapons (use grid for targeting/collisions)
       this.updateWeapons(dt);
       this.updateOrbiters(dt);
 
-      // spawning
-      this.updateSpawning(dt);
-
       // entities
-      this.updateEnemies(dt);
       this.updateBullets(dt);
       this.updateBooms(dt);
       this.updateZones(dt);
@@ -464,12 +466,65 @@
         o.y = p.y + Math.sin(o.a) * radius;
         // decrement hit cooldowns
         for (const k in o.hitCd) { o.hitCd[k] -= dt; if (o.hitCd[k] <= 0) delete o.hitCd[k]; }
-        // damage enemies
-        for (const e of this.enemies) {
+        // damage enemies (grid-accelerated)
+        this.forEachNear(o.x, o.y, 40, (e) => {
           const rr = (e.r + 12);
-          if (!o.hitCd[e.id] && dist2(o.x, o.y, e.x, e.y) < rr * rr) {
+          if (!o.hitCd[e.id] && e.hp > 0 && dist2(o.x, o.y, e.x, e.y) < rr * rr) {
             this.damageEnemy(e, s.dmg * p.dmgMul, o.x, o.y, WEAPONS.orbit.color);
             o.hitCd[e.id] = 0.35;
+          }
+        });
+      }
+    },
+
+    // ---- spatial hash grid (rebuilt each frame from enemy positions) ----
+    cellSize: 80,
+    _grid: null,
+    buildGrid() {
+      if (!this._grid) this._grid = new Map();
+      const g = this._grid; g.clear();
+      const cs = this.cellSize;
+      for (const e of this.enemies) {
+        const key = Math.floor(e.x / cs) + ',' + Math.floor(e.y / cs);
+        let cell = g.get(key);
+        if (!cell) { cell = []; g.set(key, cell); }
+        cell.push(e);
+      }
+    },
+    forEachNear(x, y, radius, cb) {
+      const cs = this.cellSize, g = this._grid;
+      if (!g) return;
+      const mincx = Math.floor((x - radius) / cs), maxcx = Math.floor((x + radius) / cs);
+      const mincy = Math.floor((y - radius) / cs), maxcy = Math.floor((y + radius) / cs);
+      for (let cx = mincx; cx <= maxcx; cx++) {
+        for (let cy = mincy; cy <= maxcy; cy++) {
+          const cell = g.get(cx + ',' + cy);
+          if (cell) for (let i = 0; i < cell.length; i++) cb(cell[i]);
+        }
+      }
+    },
+    separateEnemies() {
+      const cs = this.cellSize, g = this._grid;
+      for (const e of this.enemies) {
+        const cx = Math.floor(e.x / cs), cy = Math.floor(e.y / cs);
+        for (let ox = -1; ox <= 1; ox++) {
+          for (let oy = -1; oy <= 1; oy++) {
+            const cell = g.get((cx + ox) + ',' + (cy + oy));
+            if (!cell) continue;
+            for (let i = 0; i < cell.length; i++) {
+              const o = cell[i];
+              if (o === e || o.boss) continue;
+              const dx = e.x - o.x, dy = e.y - o.y;
+              const d2 = dx * dx + dy * dy;
+              const min = e.r + o.r;
+              if (d2 < min * min && d2 > 0.01) {
+                const d = Math.sqrt(d2);
+                const push = (min - d) * 0.25;
+                const nx = dx / d, ny = dy / d;
+                e.x += nx * push; e.y += ny * push;
+                o.x -= nx * push; o.y -= ny * push;
+              }
+            }
           }
         }
       }
@@ -589,16 +644,16 @@
         b.x += b.vx * dt; b.y += b.vy * dt;
         b.life -= dt;
         let dead = b.life <= 0;
-        for (const e of this.enemies) {
-          if (b.hit[e.id]) continue;
+        this.forEachNear(b.x, b.y, b.r + 26, (e) => {
+          if (dead || b.hit[e.id] || e.hp <= 0) return;
           const rr = e.r + b.r;
           if (dist2(b.x, b.y, e.x, e.y) < rr * rr) {
             this.damageEnemy(e, b.dmg, b.x, b.y, b.color);
             b.hit[e.id] = true;
             if (b.pierce > 0) b.pierce--;
-            else { dead = true; break; }
+            else dead = true;
           }
-        }
+        });
         if (dead) arr.splice(i, 1);
       }
     },
@@ -620,14 +675,14 @@
           b.y += (dy / d) * (b.speed + 120) * dt;
           if (d < 24) { arr.splice(i, 1); continue; }
         }
-        for (const e of this.enemies) {
-          if (b.hit[e.id]) continue;
+        this.forEachNear(b.x, b.y, b.r + 26, (e) => {
+          if (b.hit[e.id] || e.hp <= 0) return;
           const rr = e.r + b.r;
           if (dist2(b.x, b.y, e.x, e.y) < rr * rr) {
             this.damageEnemy(e, b.dmg, b.x, b.y, b.color);
-            b.hit[e.id] = b.phase === 'out' ? true : true;
+            b.hit[e.id] = true;
           }
-        }
+        });
       }
     },
 
@@ -642,15 +697,15 @@
         const z = arr[i];
         z.life -= dt;
         z.r = z.maxR * (1 - z.life / 0.45);
-        for (const e of this.enemies) {
-          if (z.hit[e.id]) continue;
+        this.forEachNear(z.x, z.y, z.r + 30, (e) => {
+          if (z.hit[e.id] || e.hp <= 0) return;
           const rr = e.r + z.r;
           if (dist2(z.x, z.y, e.x, e.y) < rr * rr) {
             this.damageEnemy(e, z.dmg, e.x, e.y, z.color);
             z.hit[e.id] = true;
             e.knockX += (e.x - z.x) * 1.2; e.knockY += (e.y - z.y) * 1.2;
           }
-        }
+        });
         if (z.life <= 0) arr.splice(i, 1);
       }
     },
@@ -662,13 +717,13 @@
       let count = 0;
       Sound.tone(900, 0.08, 'square', 0.1, null, 1400);
       for (let j = 0; j <= jumps; j++) {
-        // find nearest unhit enemy within range
+        // find nearest unhit enemy within range (grid-accelerated)
         let best = null, bestD = 320 * 320;
-        for (const e of this.enemies) {
-          if (hitIds[e.id]) continue;
+        this.forEachNear(from.x, from.y, 320, (e) => {
+          if (hitIds[e.id] || e.hp <= 0) return;
           const dd = dist2(from.x, from.y, e.x, e.y);
           if (dd < bestD) { bestD = dd; best = e; }
-        }
+        });
         if (!best) break;
         hitIds[best.id] = true;
         this.damageEnemy(best, dmg, best.x, best.y, color);
@@ -811,13 +866,19 @@
     },
 
     nearestEnemies(x, y, n) {
-      // returns up to n nearest enemies (simple, fine for moderate counts)
+      // grid-accelerated: expand search radius until enough candidates, then sort.
       if (this.enemies.length === 0) return [];
-      const arr = this.enemies.map(e => ({ e, d: dist2(x, y, e.x, e.y) }));
-      arr.sort((a, b) => a.d - b.d);
-      const out = [];
-      for (let i = 0; i < Math.min(n, arr.length); i++) out.push(arr[i].e);
-      return out;
+      const radii = [240, 500, 900, 1600];
+      let cand = [];
+      for (const R of radii) {
+        const seen = new Set(); const arr = [];
+        this.forEachNear(x, y, R, (e) => { if (!seen.has(e.id)) { seen.add(e.id); arr.push(e); } });
+        cand = arr;
+        if (arr.length >= n) break;
+      }
+      if (cand.length < n) cand = this.enemies.slice();
+      cand.sort((a, b) => dist2(x, y, a.x, a.y) - dist2(x, y, b.x, b.y));
+      return cand.slice(0, n);
     },
 
     // ---- level up choices ----
