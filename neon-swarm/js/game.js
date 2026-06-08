@@ -820,13 +820,30 @@
 
     // ---------------------------------------------------------------- LOOP
     loop(t) {
-      const dt = Math.min(0.033, (t - this.lastTime) / 1000 || 0);
+      const raw = (t - this.lastTime) / 1000 || 0;
+      const dt = Math.min(0.033, raw);
       this.lastTime = t;
       if (this.state === 'playing') {
         this.update(dt);
+        this._perfWatch(raw * 1000);
       }
       this.render();
       requestAnimationFrame((tt) => this.loop(tt));
+    },
+
+    // Auto-quality: if sustained frame time is poor on a weak device, drop effects.
+    _perfWatch(frameMs) {
+      if (this._perfLowQ) return;
+      if (frameMs <= 0 || frameMs > 200) return; // ignore stalls (tab switches)
+      if (!this._ftBuf) { this._ftBuf = []; }
+      this._ftBuf.push(frameMs);
+      if (this._ftBuf.length > 90) this._ftBuf.shift();
+      if (this._ftBuf.length >= 90) {
+        let s = 0; for (const v of this._ftBuf) s += v;
+        if (s / this._ftBuf.length > 23) { // sustained < ~43fps
+          this._perfLowQ = true;
+        }
+      }
     },
 
     update(dt) {
@@ -1718,7 +1735,7 @@
 
     // ---- particles & text & banner ----
     spawnParticles(x, y, color, n) {
-      if (Meta.data.settings.lowq) n = Math.ceil(n * 0.4);
+      if (Meta.data.settings.lowq || this._perfLowQ) n = Math.ceil(n * 0.4);
       for (let i = 0; i < n; i++) {
         const a = rand(0, TAU), s = rand(40, 200);
         this.particles.push({ kind: 'spark', x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, color, life: rand(0.2, 0.5), maxLife: 0.5, r: rand(1.5, 3.5) });
@@ -1784,8 +1801,8 @@
       }
       if (!this.player) return;
 
-      // parallax starfield (screen space, manual parallax)
-      this.renderStars(ctx);
+      // parallax starfield (screen space, manual parallax) — skipped in low-quality
+      if (!(Meta.data.settings.lowq || this._perfLowQ)) this.renderStars(ctx);
 
       ctx.save();
       let sx = 0, sy = 0;
@@ -1885,7 +1902,7 @@
 
       // intensity tint: arena slowly warms toward danger-red as the run escalates
       const intensity = clamp(this.time / 360, 0, 1);
-      if (intensity > 0.01) {
+      if (intensity > 0.01 && !(Meta.data.settings.lowq || this._perfLowQ)) {
         ctx.globalCompositeOperation = 'overlay';
         ctx.fillStyle = `rgba(${Math.round(120 * intensity)},${Math.round(20 * intensity)},${Math.round(60 * intensity)},${0.10 * intensity})`;
         ctx.fillRect(0, 0, this.W, this.H);
