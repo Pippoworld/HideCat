@@ -31,6 +31,11 @@ const { chromium } = require(gpath + '/playwright');
           const dd = (px - e.x) * (px - e.x) + (py - e.y) * (py - e.y);
           if (dd < nearest) nearest = dd;
         });
+        // also avoid incoming enemy projectiles
+        for (const eb of G.enemyBullets) {
+          const dd = (px - eb.x) * (px - eb.x) + (py - eb.y) * (py - eb.y);
+          if (dd < nearest) nearest = dd * 0.8;
+        }
         const score = Math.sqrt(nearest); // farther from nearest threat = safer
         if (score > bestScore) { bestScore = score; best = d; }
       }

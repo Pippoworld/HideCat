@@ -236,6 +236,7 @@
     bomber: { hp: 22, speed: 96, r: 16, dmg: 18, xp: 2, color: '#ff7a3c', shape: 'square', coin: 0.14, explodes: true },
     splitter: { hp: 34, speed: 72, r: 18, dmg: 10, xp: 2, color: '#5cffb0', shape: 'diamond', coin: 0.14, splits: true },
     brute: { hp: 130, speed: 50, r: 28, dmg: 18, xp: 7, color: '#ff5c3c', shape: 'hex', coin: 0.30 },
+    shooter: { hp: 28, speed: 58, r: 15, dmg: 9, xp: 3, color: '#ff4da6', shape: 'star', coin: 0.22, ranged: true },
     boss: { hp: 850, speed: 62, r: 46, dmg: 20, xp: 60, color: '#ff2bd6', shape: 'star', coin: 1.0, boss: true },
   };
 
@@ -268,7 +269,7 @@
     canvas: null, ctx: null, W: 0, H: 0, DPR: 1,
     state: 'menu', // menu, playing, levelup, pause, gameover, shop, howto
     player: null,
-    enemies: [], bullets: [], gems: [], coins: [], particles: [], dmgTexts: [], zones: [], orbiters: [], booms: [], pickups: [],
+    enemies: [], bullets: [], enemyBullets: [], gems: [], coins: [], particles: [], dmgTexts: [], zones: [], orbiters: [], booms: [], pickups: [],
     cam: { x: 0, y: 0, shake: 0 },
     time: 0, kills: 0, runCoins: 0,
     weapons: {}, // id -> level
@@ -441,7 +442,7 @@
       const ch = charById(this.charId);
       Meta.data.lastChar = this.charId; Meta.save();
       this.player = new Player();
-      this.enemies = []; this.bullets = []; this.gems = []; this.coins = [];
+      this.enemies = []; this.bullets = []; this.enemyBullets = []; this.gems = []; this.coins = [];
       this.particles = []; this.dmgTexts = []; this.zones = []; this.orbiters = []; this.booms = []; this.pickups = [];
       this.cam = { x: 0, y: 0, shake: 0 };
       this.time = 0; this.kills = 0; this.runCoins = 0;
@@ -641,6 +642,7 @@
 
       // entities
       this.updateBullets(dt);
+      this.updateEnemyBullets(dt);
       this.updateBooms(dt);
       this.updateZones(dt);
       this.updatePickups(dt);
@@ -781,7 +783,8 @@
       const t = this.time;
       const r = Math.random();
       if (t > 75 && r < 0.07) return 'brute';
-      if (t > 40 && r < 0.16) return 'splitter';
+      if (t > 55 && r < 0.13) return 'shooter';
+      if (t > 40 && r < 0.20) return 'splitter';
       if (t > 30 && r < 0.26) return 'tank';
       if (t > 20 && r < 0.42) return 'bomber';
       if (t > 8 && r < 0.62) return 'swift';
@@ -812,7 +815,7 @@
         speed: def.speed * rand(0.9, 1.1) * (mini ? 1.15 : 1), r: def.r * (mini ? 0.7 : 1),
         dmg: def.dmg, xp: mini ? 1 : def.xp, color: def.color, shape: def.shape,
         coin: mini ? 0.05 : def.coin, explodes: def.explodes, boss: def.boss,
-        splits: mini ? false : def.splits,
+        splits: mini ? false : def.splits, ranged: def.ranged,
         flash: 0, ang: 0, hitCd: 0, knockX: 0, knockY: 0,
       };
       this.enemies.push(e);
@@ -843,8 +846,25 @@
         const e = arr[i];
         const dx = p.x - e.x, dy = p.y - e.y;
         const d = Math.hypot(dx, dy) || 1;
-        e.x += (dx / d) * e.speed * dt + e.knockX * dt;
-        e.y += (dy / d) * e.speed * dt + e.knockY * dt;
+        if (e.ranged) {
+          // keep stand-off distance, strafe, and fire at the player
+          const desired = 240;
+          let mv = 0;
+          if (d > desired + 50) mv = 1; else if (d < desired - 50) mv = -0.8;
+          e.x += (dx / d) * e.speed * mv * dt + e.knockX * dt;
+          e.y += (dy / d) * e.speed * mv * dt + e.knockY * dt;
+          // strafe
+          e.x += (-dy / d) * e.speed * 0.3 * dt;
+          e.y += (dx / d) * e.speed * 0.3 * dt;
+          e.shootCd = (e.shootCd != null ? e.shootCd : rand(0.8, 2.2)) - dt;
+          if (e.shootCd <= 0 && d < 520) {
+            this.spawnEnemyBullet(e.x, e.y, Math.atan2(dy, dx), e.dmg);
+            e.shootCd = 2.0;
+          }
+        } else {
+          e.x += (dx / d) * e.speed * dt + e.knockX * dt;
+          e.y += (dy / d) * e.speed * dt + e.knockY * dt;
+        }
         e.knockX *= 0.86; e.knockY *= 0.86;
         if (e.flash > 0) e.flash -= dt;
         if (e.hitCd > 0) e.hitCd -= dt;
@@ -867,6 +887,27 @@
         x, y, vx: Math.cos(ang) * speed, vy: Math.sin(ang) * speed,
         dmg, pierce, color, r: r || 5, life: (lifeMul || 1) * 1.6, hit: {},
       });
+    },
+
+    spawnEnemyBullet(x, y, ang, dmg) {
+      const sp = 230;
+      this.enemyBullets.push({ x, y, vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp, r: 7, dmg, life: 3.5 });
+    },
+
+    updateEnemyBullets(dt) {
+      const p = this.player;
+      const arr = this.enemyBullets;
+      for (let i = arr.length - 1; i >= 0; i--) {
+        const b = arr[i];
+        b.x += b.vx * dt; b.y += b.vy * dt; b.life -= dt;
+        const rr = p.r + b.r;
+        if (p.invuln <= 0 && dist2(b.x, b.y, p.x, p.y) < rr * rr) {
+          this.hurtPlayer(b.dmg);
+          arr.splice(i, 1);
+          continue;
+        }
+        if (b.life <= 0) arr.splice(i, 1);
+      }
     },
 
     spawnBoomerang(x, y, ang, dmg, range, color, orbit) {
@@ -1489,6 +1530,13 @@
       for (const b of this.bullets) {
         ctx.fillStyle = b.color;
         ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, TAU); ctx.fill();
+      }
+      // enemy bullets (hostile orbs)
+      for (const b of this.enemyBullets) {
+        ctx.fillStyle = '#ff2b6d';
+        ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, TAU); ctx.fill();
+        ctx.fillStyle = 'rgba(255,150,180,0.7)';
+        ctx.beginPath(); ctx.arc(b.x, b.y, b.r * 0.5, 0, TAU); ctx.fill();
       }
       // booms
       for (const b of this.booms) {
