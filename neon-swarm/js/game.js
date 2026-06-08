@@ -1998,8 +1998,8 @@
       // off-screen boss indicators (screen space)
       this.drawBossIndicators(ctx);
 
-      // first-run onboarding hint
-      if (this._hintLife > 0) {
+      // first-run onboarding hint (only during live play, not behind overlays)
+      if (this._hintLife > 0 && this.state === 'playing') {
         this._hintLife -= 0.016;
         ctx.save();
         ctx.globalAlpha = clamp(this._hintLife, 0, 1) * 0.9;
