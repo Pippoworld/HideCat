@@ -86,6 +86,30 @@ html, body {
 }
 .btn.primary:hover { box-shadow: 0 0 34px rgba(24,224,255,0.75); }
 .btn.small { font-size: 14px; padding: 10px 16px; }
+.btn.daily {
+  color: #1a0e22;
+  background: linear-gradient(180deg, #ffa6f0, #c46bff);
+  border-color: #ffc6f6; box-shadow: 0 0 20px rgba(196,107,255,0.4);
+}
+
+/* ---------- Daily ---------- */
+#daily-date { color: #9fb4d6; font-weight: 700; letter-spacing: 1px; }
+#daily-card {
+  background: var(--panel); border: 2px solid rgba(196,107,255,0.4);
+  border-radius: 16px; padding: 18px; width: min(420px, 90vw);
+  display: flex; flex-direction: column; gap: 12px;
+}
+#daily-pilot { font-size: 18px; font-weight: 800; color: var(--neon); }
+#daily-mods { display: flex; flex-direction: column; gap: 8px; }
+.daily-mod {
+  display: flex; align-items: center; gap: 10px; text-align: left;
+  background: rgba(196,107,255,0.1); border: 1px solid rgba(196,107,255,0.3);
+  border-radius: 10px; padding: 8px 12px;
+}
+.daily-mod .mic { font-size: 22px; }
+.daily-mod .mnm { font-weight: 800; color: #ffc6f6; font-size: 14px; }
+.daily-mod .mds { font-size: 12px; color: #b9cce8; }
+#daily-best { color: var(--gold); font-weight: 800; font-size: 16px; min-height: 22px; }
 .btn.revive {
   color: #02140a;
   background: linear-gradient(180deg, #6dffb0, #2fd683);

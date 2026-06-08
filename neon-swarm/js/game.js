@@ -17,11 +17,52 @@
     return (m < 10 ? '0' : '') + m + ':' + (ss < 10 ? '0' : '') + ss;
   };
 
+  // ---------------------------------------------------------------- daily seed
+  function mulberry32(a) {
+    return function () {
+      a |= 0; a = a + 0x6D2B79F5 | 0;
+      let t = Math.imul(a ^ a >>> 15, 1 | a);
+      t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+      return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    };
+  }
+  function todaySeed() {
+    const d = new Date();
+    return d.getUTCFullYear() * 10000 + (d.getUTCMonth() + 1) * 100 + d.getUTCDate();
+  }
+  function todayLabel() {
+    const d = new Date();
+    return d.toISOString().slice(0, 10);
+  }
+
+  // Daily modifiers — two are rolled each day to keep the challenge fresh.
+  const DAILY_MODIFIERS = [
+    { id: 'doublexp', ic: '📘', nm: 'Double XP', ds: 'Gain XP twice as fast.', apply: (g, p) => { p.xpMul *= 2; } },
+    { id: 'glass', ic: '💥', nm: 'Glass Cannon', ds: '+50% damage dealt and taken.', apply: (g, p) => { p.dmgMul += 0.5; g.modIncomingDmg = 1.5; } },
+    { id: 'swarm', ic: '🐝', nm: 'Swarm', ds: 'Far more enemies spawn.', apply: (g) => { g.modSpawnMul = 1.4; } },
+    { id: 'bossrush', ic: '👹', nm: 'Boss Rush', ds: 'A boss every 60 seconds.', apply: (g) => { g.modBossPeriod = 60; } },
+    { id: 'goldrush', ic: '◈', nm: 'Gold Rush', ds: 'Double coins.', apply: (g, p) => { p.coinMul += 1; } },
+    { id: 'frenzy', ic: '🌀', nm: 'Frenzy', ds: 'Everything moves faster.', apply: (g, p) => { g.modEnemySpeed = 1.25; p.speedMul += 0.12; } },
+    { id: 'berserk', ic: '🔥', nm: 'Berserk', ds: '+30% fire rate, but 30% less HP.', apply: (g, p) => { p.fireRateMul *= 0.77; p.maxHp = Math.round(p.maxHp * 0.7); } },
+    { id: 'magnetize', ic: '🧲', nm: 'Magnetize', ds: 'Huge pickup range.', apply: (g, p) => { p.pickupMul += 1; } },
+  ];
+
+  function buildDailyConfig() {
+    const seed = todaySeed();
+    const r = mulberry32(seed);
+    const pilot = CHARACTERS[Math.floor(r() * CHARACTERS.length)].id;
+    const diff = ['normal', 'hard'][Math.floor(r() * 2)];
+    const pool = DAILY_MODIFIERS.slice();
+    const mods = [];
+    for (let i = 0; i < 2; i++) mods.push(pool.splice(Math.floor(r() * pool.length), 1)[0]);
+    return { seed, pilot, diff, mods };
+  }
+
   // ---------------------------------------------------------------- meta save
   const SAVE_KEY = 'neonswarm_save_v1';
   const Meta = {
     data: { coins: 0, best: 0, bestTime: 0, runs: 0, totalKills: 0, bossKills: 0, coinsEarned: 0, upgrades: {}, chars: { vanguard: 1 }, achievements: {}, muted: 0, lastChar: 'vanguard', scores: [], difficulty: 'normal',
-      settings: { music: 100, sfx: 100, shake: 1, dmg: 1, lowq: 0 } },
+      settings: { music: 100, sfx: 100, shake: 1, dmg: 1, lowq: 0 }, daily: { seed: 0, best: 0, plays: 0 } },
     load() {
       try {
         const s = JSON.parse(localStorage.getItem(SAVE_KEY));
@@ -345,6 +386,9 @@
     wireUI() {
       const $ = (id) => document.getElementById(id);
       $('play-btn').onclick = () => { Sound.init(); Sound.resume(); this.showCharSelect(); };
+      $('daily-btn').onclick = () => { Sound.init(); Sound.resume(); this.showDaily(); };
+      $('daily-back').onclick = () => this.showMenu();
+      $('daily-play').onclick = () => this.startDaily();
       $('upgrades-btn').onclick = () => this.showShop();
       $('awards-btn').onclick = () => this.showAwards();
       $('awards-back').onclick = () => this.showMenu();
@@ -357,7 +401,7 @@
       $('pause-btn').onclick = () => this.togglePause();
       $('resume-btn').onclick = () => this.togglePause();
       $('quit-btn').onclick = () => { if (window.Ads) Ads.gameplayStop(); this.endRun(false); this.showMenu(); };
-      $('retry-btn').onclick = async () => { if (window.Ads) await Ads.interstitial(); this.startRun(this.charId); };
+      $('retry-btn').onclick = async () => { if (window.Ads) await Ads.interstitial(); if (this.isDaily) this.startDaily(); else this.startRun(this.charId); };
       $('menu-btn').onclick = async () => { if (window.Ads) await Ads.interstitial(); this.showMenu(); };
       $('continue-btn').onclick = () => this.continueRun();
       $('share-btn').onclick = () => this.shareScore();
@@ -448,7 +492,7 @@
     },
 
     hideAll() {
-      ['menu', 'levelup', 'pause', 'gameover', 'shop', 'howto', 'charselect', 'awards', 'settings'].forEach(id => document.getElementById(id).classList.add('hidden'));
+      ['menu', 'levelup', 'pause', 'gameover', 'shop', 'howto', 'charselect', 'awards', 'settings', 'daily'].forEach(id => document.getElementById(id).classList.add('hidden'));
       document.getElementById('hud').classList.add('hidden');
     },
 
@@ -498,6 +542,24 @@
           location.reload();
         }
       };
+    },
+
+    showDaily() {
+      this.state = 'daily';
+      this.hideAll();
+      document.getElementById('daily').classList.remove('hidden');
+      const cfg = buildDailyConfig();
+      const ch = charById(cfg.pilot);
+      const diff = diffById(cfg.diff);
+      document.getElementById('daily-date').textContent = todayLabel() + ' · resets at UTC midnight';
+      document.getElementById('daily-pilot').innerHTML = `${ch.ic} ${ch.nm} · <span style="color:var(--bad)">${diff.nm}</span>`;
+      document.getElementById('daily-mods').innerHTML = cfg.mods.map(m =>
+        `<div class="daily-mod"><span class="mic">${m.ic}</span><div><div class="mnm">${m.nm}</div><div class="mds">${m.ds}</div></div></div>`).join('');
+      const d = Meta.data.daily;
+      const isToday = d && d.seed === cfg.seed;
+      document.getElementById('daily-best').textContent = (isToday && d.best)
+        ? `Today's best: ${d.best.toLocaleString()}  (${d.plays} ${d.plays === 1 ? 'run' : 'runs'})`
+        : 'No run today yet — set the pace!';
     },
 
     showAwards() {
@@ -552,10 +614,11 @@
       this.hideAll();
       document.getElementById('hud').classList.remove('hidden');
       this.state = 'playing';
+      this.isDaily = !!this._pendingDaily; this._pendingDaily = false;
       this.charId = charId || this.charId || 'vanguard';
       const ch = charById(this.charId);
-      this.diff = diffById(Meta.data.difficulty);
-      Meta.data.lastChar = this.charId; Meta.save();
+      this.diff = diffById(this.isDaily ? this.dailyCfg.diff : Meta.data.difficulty);
+      if (!this.isDaily) { Meta.data.lastChar = this.charId; Meta.save(); }
       this.player = new Player();
       this.enemies = []; this.bullets = []; this.enemyBullets = []; this.gems = []; this.coins = [];
       this.particles = []; this.dmgTexts = []; this.zones = []; this.orbiters = []; this.booms = []; this.pickups = [];
@@ -572,6 +635,8 @@
       this._usedContinue = false;
       this._flash = 0; this._banner = null;
       this.paused = false;
+      // daily-modifier fields (default = no effect)
+      this.modSpawnMul = 1; this.modBossPeriod = 90; this.modIncomingDmg = 1; this.modEnemySpeed = 1;
 
       // apply meta upgrades
       const p = this.player;
@@ -599,6 +664,12 @@
       if (m.xpMul) p.xpMul += m.xpMul;
       if (m.regen) p.regen += m.regen;
 
+      // apply daily-challenge modifiers
+      if (this.isDaily && this.dailyMods) {
+        for (const mod of this.dailyMods) mod.apply(this, p);
+        p.hp = p.maxHp;
+      }
+
       this.recalc();
       Sound.startMusic(0);
       if (window.Ads) Ads.gameplayStart();
@@ -607,6 +678,15 @@
       this._hintLife = Meta.data.seenTutorial ? 0 : 4.5;
       if (!Meta.data.seenTutorial) { Meta.data.seenTutorial = 1; Meta.save(); }
       this.updateHUD();
+    },
+
+    startDaily() {
+      Sound.init(); Sound.resume();
+      this.dailyCfg = buildDailyConfig();
+      this.dailyMods = this.dailyCfg.mods;
+      this._pendingDaily = true;
+      this.startRun(this.dailyCfg.pilot);
+      this.track('daily_start', { seed: this.dailyCfg.seed });
     },
 
     endRun(record) {
@@ -619,7 +699,13 @@
       // final score = combat score + survival/level/coin bonuses
       this.finalScore = Math.round(((this.score || 0) + Math.floor(this.time) * 8 + p.level * 200 + this.runCoins * 2) * (this.diff ? this.diff.score : 1));
       this.scoreRank = -1;
-      if (record) {
+      this.dailyBest = false;
+      if (record && this.isDaily) {
+        const seed = todaySeed();
+        if (!Meta.data.daily || Meta.data.daily.seed !== seed) Meta.data.daily = { seed, best: 0, plays: 0 };
+        Meta.data.daily.plays++;
+        if (this.finalScore > Meta.data.daily.best) { Meta.data.daily.best = this.finalScore; this.dailyBest = true; }
+      } else if (record) {
         if (p.level > Meta.data.best) Meta.data.best = p.level;
         if (this.time > Meta.data.bestTime) Meta.data.bestTime = this.time;
         if (!Meta.data.scores) Meta.data.scores = [];
@@ -914,14 +1000,14 @@
       const cap = Math.min(280, 150 + Math.floor(t / 5)); // density grows over time
       if (this.enemies.length >= cap) { this.spawnAcc = 0; }
       // spawn rate ramps up over time
-      const interval = clamp(0.85 - t * 0.0042, 0.16, 0.85) / (this.diff ? this.diff.spawn : 1);
+      const interval = clamp(0.85 - t * 0.0042, 0.16, 0.85) / ((this.diff ? this.diff.spawn : 1) * (this.modSpawnMul || 1));
       const batch = 1 + Math.floor(t / 30);
       if (this.spawnAcc >= interval && this.enemies.length < cap) {
         this.spawnAcc = 0;
         for (let i = 0; i < batch; i++) this.spawnEnemy();
       }
-      // boss every 90s; doubles up after 5 minutes
-      const bossWave = Math.floor(t / 90);
+      // boss cadence (modifiable); doubles up after 5 minutes
+      const bossWave = Math.floor(t / (this.modBossPeriod || 90));
       if (bossWave >= 1 && !this.bossSpawned[bossWave]) {
         this.bossSpawned[bossWave] = true;
         this.spawnBoss(bossWave);
@@ -962,7 +1048,7 @@
         id: this._eid = (this._eid || 0) + 1,
         type, x, y,
         hp: def.hp * hpScale * (mini ? 0.5 : 1), maxHp: def.hp * hpScale * (mini ? 0.5 : 1),
-        speed: def.speed * rand(0.9, 1.1) * (mini ? 1.15 : 1), r: def.r * (mini ? 0.7 : 1),
+        speed: def.speed * rand(0.9, 1.1) * (mini ? 1.15 : 1) * (this.modEnemySpeed || 1), r: def.r * (mini ? 0.7 : 1),
         dmg: def.dmg, xp: mini ? 1 : def.xp, color: def.color, shape: def.shape,
         coin: mini ? 0.05 : def.coin, explodes: def.explodes, boss: def.boss,
         splits: mini ? false : def.splits, ranged: def.ranged,
@@ -1239,7 +1325,7 @@
 
     hurtPlayer(dmg) {
       const p = this.player;
-      dmg *= (this.diff ? this.diff.dmg : 1);
+      dmg *= (this.diff ? this.diff.dmg : 1) * (this.modIncomingDmg || 1);
       p.hp -= dmg;
       p.invuln = 0.7;
       p.hitFlash = 0.25;
@@ -1313,6 +1399,11 @@
       else if (this.scoreRank > 0) html += `<div style="color:var(--neon2);margin:4px 0">Top ${this.scoreRank + 1} run</div>`;
       html += `<div style="margin-top:8px">Level <b>${this.player.level}</b> · Survived <b>${fmtTime(this.time)}</b><br>` +
         `Kills <b>${this.kills}</b> · Best Combo <b>${this.bestCombo}x</b> · <b style="color:var(--gold)">◈ ${this.runCoins}</b></div>`;
+      if (this.isDaily) {
+        html += `<div style="margin-top:10px;color:#c46bff;font-weight:800">⚡ DAILY CHALLENGE</div>` +
+          (this.dailyBest ? `<div style="color:var(--gold);font-weight:800">★ NEW DAILY BEST!</div>`
+            : `<div style="color:#9fb4d6">Today's best: ${((Meta.data.daily && Meta.data.daily.best) || 0).toLocaleString()}</div>`);
+      }
       if (this._newUnlocks && this._newUnlocks.length) {
         html += '<br><br><span style="color:var(--neon2);font-weight:800">★ PILOT UNLOCKED</span><br>' +
           this._newUnlocks.map(c => `${c.ic} ${c.nm}`).join(' · ');
@@ -1657,7 +1748,7 @@
       ctx.fillStyle = '#05060f';
       ctx.fillRect(0, 0, this.W, this.H);
 
-      if (this.state === 'menu' || this.state === 'shop' || this.state === 'howto' || this.state === 'charselect' || this.state === 'awards' || this.state === 'settings') {
+      if (this.state === 'menu' || this.state === 'shop' || this.state === 'howto' || this.state === 'charselect' || this.state === 'awards' || this.state === 'settings' || this.state === 'daily') {
         this.renderMenuBg();
         return;
       }
