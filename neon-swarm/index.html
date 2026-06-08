@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#05060f">
+<meta name="description" content="NEON SWARM - a fast, addictive survivors-style roguelite. Dodge the swarm, level up, build a deadly weapon combo and survive the night.">
+<title>NEON SWARM</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="game-root">
+  <canvas id="game"></canvas>
+
+  <!-- In-game HUD -->
+  <div id="hud" class="hidden">
+    <div id="hud-top">
+      <div id="xp-bar"><div id="xp-fill"></div><span id="level-label">LV 1</span></div>
+      <div id="hud-stats">
+        <span id="timer">00:00</span>
+        <span id="kills">☠ 0</span>
+        <span id="coins">◈ 0</span>
+      </div>
+    </div>
+    <div id="hp-wrap"><div id="hp-fill"></div><span id="hp-text"></span></div>
+    <button id="pause-btn" aria-label="Pause">❚❚</button>
+  </div>
+
+  <!-- Main menu -->
+  <div id="menu" class="overlay">
+    <h1 class="logo">NEON<span>SWARM</span></h1>
+    <p class="tagline">Survive the swarm. Build your power. Don't stop moving.</p>
+    <div class="menu-buttons">
+      <button id="play-btn" class="btn primary">PLAY</button>
+      <button id="upgrades-btn" class="btn">UPGRADES</button>
+      <button id="how-btn" class="btn">HOW TO PLAY</button>
+    </div>
+    <div id="best-line"></div>
+    <p class="credit">A neon roguelite • move with WASD / drag • auto-fire</p>
+  </div>
+
+  <!-- Level up -->
+  <div id="levelup" class="overlay hidden">
+    <h2 class="lu-title">LEVEL UP</h2>
+    <div id="lu-cards"></div>
+    <button id="lu-reroll" class="btn small">↻ Reroll (<span id="reroll-count">0</span>)</button>
+  </div>
+
+  <!-- Pause -->
+  <div id="pause" class="overlay hidden">
+    <h2>PAUSED</h2>
+    <div id="pause-build"></div>
+    <div class="menu-buttons">
+      <button id="resume-btn" class="btn primary">RESUME</button>
+      <button id="quit-btn" class="btn">QUIT</button>
+    </div>
+  </div>
+
+  <!-- Game over -->
+  <div id="gameover" class="overlay hidden">
+    <h2 id="go-title">YOU DIED</h2>
+    <div id="go-stats"></div>
+    <div class="menu-buttons">
+      <button id="retry-btn" class="btn primary">RETRY</button>
+      <button id="menu-btn" class="btn">MENU</button>
+    </div>
+  </div>
+
+  <!-- Upgrades shop -->
+  <div id="shop" class="overlay hidden">
+    <h2>META UPGRADES</h2>
+    <div id="shop-coins"></div>
+    <div id="shop-grid"></div>
+    <button id="shop-back" class="btn">BACK</button>
+  </div>
+
+  <!-- How to play -->
+  <div id="howto" class="overlay hidden">
+    <h2>HOW TO PLAY</h2>
+    <ul class="howlist">
+      <li><b>Move</b> with WASD / Arrow keys, or <b>drag</b> anywhere on touch.</li>
+      <li>Your weapons <b>fire automatically</b> — focus on dodging.</li>
+      <li>Kill enemies to drop <b>XP</b>. Collect it to <b>level up</b>.</li>
+      <li>On level up, <b>choose an upgrade</b> to build your run.</li>
+      <li>Grab <b>◈ coins</b> to spend on permanent meta upgrades.</li>
+      <li>Survive as long as you can. The swarm never stops.</li>
+    </ul>
+    <button id="howto-back" class="btn">BACK</button>
+  </div>
+</div>
+
+<script src="js/audio.js"></script>
+<script src="js/input.js"></script>
+<script src="js/game.js"></script>
+</body>
+</html>
