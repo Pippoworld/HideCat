@@ -234,6 +234,8 @@
     swift: { hp: 9, speed: 158, r: 11, dmg: 6, xp: 1, color: '#ffe24d', shape: 'diamond', coin: 0.10 },
     tank: { hp: 60, speed: 58, r: 22, dmg: 12, xp: 4, color: '#9b5cff', shape: 'hex', coin: 0.18 },
     bomber: { hp: 22, speed: 96, r: 16, dmg: 18, xp: 2, color: '#ff7a3c', shape: 'square', coin: 0.14, explodes: true },
+    splitter: { hp: 34, speed: 72, r: 18, dmg: 10, xp: 2, color: '#5cffb0', shape: 'diamond', coin: 0.14, splits: true },
+    brute: { hp: 130, speed: 50, r: 28, dmg: 18, xp: 7, color: '#ff5c3c', shape: 'hex', coin: 0.30 },
     boss: { hp: 850, speed: 62, r: 46, dmg: 20, xp: 60, color: '#ff2bd6', shape: 'star', coin: 1.0, boss: true },
   };
 
@@ -286,6 +288,7 @@
       Meta.load();
       if (window.Ads) Ads.init();
       Input.init(this.canvas);
+      this.genStars();
       this.resize();
       window.addEventListener('resize', () => this.resize());
       // auto-pause when the tab is hidden so players don't die while away
@@ -777,15 +780,16 @@
     enemyMix() {
       const t = this.time;
       const r = Math.random();
-      if (t > 30 && r < 0.12) return 'tank';
-      if (t > 20 && r < 0.30) return 'bomber';
-      if (t > 8 && r < 0.55) return 'swift';
+      if (t > 75 && r < 0.07) return 'brute';
+      if (t > 40 && r < 0.16) return 'splitter';
+      if (t > 30 && r < 0.26) return 'tank';
+      if (t > 20 && r < 0.42) return 'bomber';
+      if (t > 8 && r < 0.62) return 'swift';
       return 'grunt';
     },
 
     spawnEnemy(forceType) {
       const type = forceType || this.enemyMix();
-      const def = ENEMY_TYPES[type];
       // Predictive spawning: while the player is moving, bias most spawns into the
       // forward arc so they can't outrun the swarm into empty space.
       let ang;
@@ -795,19 +799,24 @@
         ang = rand(0, TAU);
       }
       const d = Math.max(this.W, this.H) * 0.6 + rand(0, 120);
-      const x = this.player.x + Math.cos(ang) * d;
-      const y = this.player.y + Math.sin(ang) * d;
-      // scale hp with time
+      this._createEnemy(type, this.player.x + Math.cos(ang) * d, this.player.y + Math.sin(ang) * d);
+    },
+
+    _createEnemy(type, x, y, mini) {
+      const def = ENEMY_TYPES[type];
       const hpScale = 1 + this.time * 0.009;
-      this.enemies.push({
+      const e = {
         id: this._eid = (this._eid || 0) + 1,
         type, x, y,
-        hp: def.hp * hpScale, maxHp: def.hp * hpScale,
-        speed: def.speed * rand(0.9, 1.1), r: def.r,
-        dmg: def.dmg, xp: def.xp, color: def.color, shape: def.shape,
-        coin: def.coin, explodes: def.explodes, boss: def.boss,
+        hp: def.hp * hpScale * (mini ? 0.5 : 1), maxHp: def.hp * hpScale * (mini ? 0.5 : 1),
+        speed: def.speed * rand(0.9, 1.1) * (mini ? 1.15 : 1), r: def.r * (mini ? 0.7 : 1),
+        dmg: def.dmg, xp: mini ? 1 : def.xp, color: def.color, shape: def.shape,
+        coin: mini ? 0.05 : def.coin, explodes: def.explodes, boss: def.boss,
+        splits: mini ? false : def.splits,
         flash: 0, ang: 0, hitCd: 0, knockX: 0, knockY: 0,
-      });
+      };
+      this.enemies.push(e);
+      return e;
     },
 
     spawnBoss(wave) {
@@ -1030,6 +1039,10 @@
       if (exploded) {
         // bomber explosion damages nearby enemies + player handled in touch
         this.spawnZone(e.x, e.y, 70, 14, '#ff7a3c');
+      }
+      // splitters burst into two fast minis
+      if (e.splits && this.enemies.length < 300) {
+        for (let k = 0; k < 2; k++) this._createEnemy('grunt', e.x + rand(-22, 22), e.y + rand(-22, 22), true);
       }
     },
 
@@ -1420,6 +1433,9 @@
       }
       if (!this.player) return;
 
+      // parallax starfield (screen space, manual parallax)
+      this.renderStars(ctx);
+
       ctx.save();
       let sx = 0, sy = 0;
       if (this.shakeAmt > 0) { sx = rand(-this.shakeAmt, this.shakeAmt); sy = rand(-this.shakeAmt, this.shakeAmt); }
@@ -1566,6 +1582,44 @@
           ctx.restore();
         }
       }
+    },
+
+    genStars() {
+      this.starLayers = [
+        { par: 0.25, tile: 1400, stars: [] },
+        { par: 0.5, tile: 1050, stars: [] },
+      ];
+      for (const L of this.starLayers) {
+        const n = L.par < 0.4 ? 48 : 34;
+        for (let i = 0; i < n; i++) {
+          const roll = Math.random();
+          L.stars.push({
+            x: Math.random() * L.tile, y: Math.random() * L.tile,
+            r: rand(0.6, 1.9), a: rand(0.2, 0.7),
+            c: roll < 0.5 ? '#9fdcff' : roll < 0.78 ? '#ffffff' : '#ff9ad6',
+          });
+        }
+      }
+    },
+
+    renderStars(ctx) {
+      if (!this.starLayers) return;
+      for (const L of this.starLayers) {
+        const tile = L.tile;
+        let ox = (-this.cam.x * L.par) % tile; if (ox < 0) ox += tile;
+        let oy = (-this.cam.y * L.par) % tile; if (oy < 0) oy += tile;
+        for (const s of L.stars) {
+          for (let gx = -tile; gx <= this.W; gx += tile) {
+            for (let gy = -tile; gy <= this.H; gy += tile) {
+              const sx = s.x + ox + gx, sy = s.y + oy + gy;
+              if (sx < -2 || sx > this.W + 2 || sy < -2 || sy > this.H + 2) continue;
+              ctx.globalAlpha = s.a; ctx.fillStyle = s.c;
+              ctx.beginPath(); ctx.arc(sx, sy, s.r, 0, TAU); ctx.fill();
+            }
+          }
+        }
+      }
+      ctx.globalAlpha = 1;
     },
 
     renderGrid(ctx) {
