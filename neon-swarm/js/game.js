@@ -319,6 +319,8 @@
       document.addEventListener('visibilitychange', () => {
         if (document.hidden && this.state === 'playing') this.togglePause();
       });
+      // desktop keyboard shortcuts
+      window.addEventListener('keydown', (e) => this.onKey(e));
       this.wireUI();
       this.showMenu();
       requestAnimationFrame((t) => this.loop(t));
@@ -422,6 +424,20 @@
         }
         grid.appendChild(card);
       });
+    },
+
+    onKey(e) {
+      if (e.code === 'Escape' || e.code === 'KeyP') {
+        if (this.state === 'playing' || this.state === 'pause') { e.preventDefault(); this.togglePause(); }
+      } else if (this.state === 'levelup' && (e.code === 'Digit1' || e.code === 'Digit2' || e.code === 'Digit3')) {
+        const i = +e.code.slice(5) - 1;
+        if (this._luChoices && this._luChoices[i]) { e.preventDefault(); this.chooseUpgrade(this._luChoices[i]); }
+      } else if (this.state === 'levelup' && e.code === 'KeyR') {
+        e.preventDefault(); this.reroll();
+      } else if (this.state === 'gameover' && (e.code === 'Enter' || e.code === 'Space')) {
+        e.preventDefault();
+        (async () => { if (window.Ads) await Ads.interstitial(); this.startRun(this.charId); })();
+      }
     },
 
     hideAll() {
