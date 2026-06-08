@@ -20,7 +20,7 @@
   // ---------------------------------------------------------------- meta save
   const SAVE_KEY = 'neonswarm_save_v1';
   const Meta = {
-    data: { coins: 0, best: 0, bestTime: 0, runs: 0, totalKills: 0, bossKills: 0, coinsEarned: 0, upgrades: {}, chars: { vanguard: 1 }, achievements: {}, muted: 0, lastChar: 'vanguard', scores: [] },
+    data: { coins: 0, best: 0, bestTime: 0, runs: 0, totalKills: 0, bossKills: 0, coinsEarned: 0, upgrades: {}, chars: { vanguard: 1 }, achievements: {}, muted: 0, lastChar: 'vanguard', scores: [], difficulty: 'normal' },
     load() {
       try {
         const s = JSON.parse(localStorage.getItem(SAVE_KEY));
@@ -36,6 +36,14 @@
     lvl(id) { return this.data.upgrades[id] || 0; },
     hasChar(id) { return !!this.data.chars[id]; },
   };
+
+  // ---------------------------------------------------------------- difficulty
+  const DIFFICULTIES = [
+    { id: 'easy', nm: 'EASY', dmg: 0.7, spawn: 0.85, hp: 0.85, score: 0.7 },
+    { id: 'normal', nm: 'NORMAL', dmg: 1.0, spawn: 1.0, hp: 1.0, score: 1.0 },
+    { id: 'hard', nm: 'HARD', dmg: 1.4, spawn: 1.18, hp: 1.25, score: 1.5 },
+  ];
+  const diffById = (id) => DIFFICULTIES.find(d => d.id === id) || DIFFICULTIES[1];
 
   // ---------------------------------------------------------------- achievements
   const ACHIEVEMENTS = [
@@ -339,6 +347,8 @@
       $('howto-back').onclick = () => this.showMenu();
       $('shop-back').onclick = () => this.showMenu();
       $('char-back').onclick = () => this.showMenu();
+      $('diff-prev').onclick = () => this.cycleDifficulty(-1);
+      $('diff-next').onclick = () => this.cycleDifficulty(1);
       $('pause-btn').onclick = () => this.togglePause();
       $('resume-btn').onclick = () => this.togglePause();
       $('quit-btn').onclick = () => { if (window.Ads) Ads.gameplayStop(); this.endRun(false); this.showMenu(); };
@@ -362,7 +372,23 @@
       this.state = 'charselect';
       this.hideAll();
       document.getElementById('charselect').classList.remove('hidden');
+      this.renderDifficulty();
       this.renderChars();
+    },
+
+    renderDifficulty() {
+      const d = diffById(Meta.data.difficulty);
+      document.getElementById('diff-name').textContent = d.nm;
+      document.getElementById('diff-mult').textContent = d.score.toFixed(1) + '× score';
+    },
+
+    cycleDifficulty(dir) {
+      const idx = DIFFICULTIES.findIndex(d => d.id === Meta.data.difficulty);
+      const ni = (idx + dir + DIFFICULTIES.length) % DIFFICULTIES.length;
+      Meta.data.difficulty = DIFFICULTIES[ni].id;
+      Meta.save();
+      Sound.select();
+      this.renderDifficulty();
     },
 
     renderChars() {
@@ -475,6 +501,7 @@
       this.state = 'playing';
       this.charId = charId || this.charId || 'vanguard';
       const ch = charById(this.charId);
+      this.diff = diffById(Meta.data.difficulty);
       Meta.data.lastChar = this.charId; Meta.save();
       this.player = new Player();
       this.enemies = []; this.bullets = []; this.enemyBullets = []; this.gems = []; this.coins = [];
@@ -535,7 +562,7 @@
       Meta.data.coinsEarned = (Meta.data.coinsEarned || 0) + this.runCoins;
       Meta.data.totalKills = (Meta.data.totalKills || 0) + this.kills;
       // final score = combat score + survival/level/coin bonuses
-      this.finalScore = (this.score || 0) + Math.floor(this.time) * 8 + p.level * 200 + this.runCoins * 2;
+      this.finalScore = Math.round(((this.score || 0) + Math.floor(this.time) * 8 + p.level * 200 + this.runCoins * 2) * (this.diff ? this.diff.score : 1));
       this.scoreRank = -1;
       if (record) {
         if (p.level > Meta.data.best) Meta.data.best = p.level;
@@ -825,7 +852,7 @@
       const cap = Math.min(280, 150 + Math.floor(t / 5)); // density grows over time
       if (this.enemies.length >= cap) { this.spawnAcc = 0; }
       // spawn rate ramps up over time
-      const interval = clamp(0.85 - t * 0.0042, 0.16, 0.85);
+      const interval = clamp(0.85 - t * 0.0042, 0.16, 0.85) / (this.diff ? this.diff.spawn : 1);
       const batch = 1 + Math.floor(t / 30);
       if (this.spawnAcc >= interval && this.enemies.length < cap) {
         this.spawnAcc = 0;
@@ -868,7 +895,7 @@
 
     _createEnemy(type, x, y, mini) {
       const def = ENEMY_TYPES[type];
-      const hpScale = 1 + this.time * 0.009;
+      const hpScale = (1 + this.time * 0.009) * (this.diff ? this.diff.hp : 1);
       const e = {
         id: this._eid = (this._eid || 0) + 1,
         type, x, y,
@@ -1150,6 +1177,7 @@
 
     hurtPlayer(dmg) {
       const p = this.player;
+      dmg *= (this.diff ? this.diff.dmg : 1);
       p.hp -= dmg;
       p.invuln = 0.7;
       p.hitFlash = 0.25;

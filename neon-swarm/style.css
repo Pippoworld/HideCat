@@ -249,6 +249,19 @@ html, body {
 .char-card .wp { font-size: 11px; color: var(--gold); font-weight: 700; }
 .char-card .lock { font-size: 11px; color: #ff9a3c; font-weight: 700; }
 
+#diff-row {
+  display: flex; align-items: center; gap: 10px;
+  font-size: 14px; font-weight: 800; letter-spacing: 1px; color: #9fb4d6;
+}
+#diff-name { color: var(--neon); min-width: 78px; text-align: center; font-size: 16px; }
+#diff-mult { color: var(--gold); font-size: 12px; }
+.diff-arrow {
+  width: 32px; height: 32px; font-size: 20px; font-weight: 900;
+  color: #cfe9ff; background: rgba(20,30,60,0.7);
+  border: 1px solid rgba(24,224,255,0.3); border-radius: 8px; cursor: pointer;
+}
+.diff-arrow:active { transform: scale(0.92); }
+
 .icon-btn {
   position: absolute; top: 14px; right: 14px;
   width: 44px; height: 44px; font-size: 20px;
