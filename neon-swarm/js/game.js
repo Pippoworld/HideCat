@@ -677,6 +677,8 @@
       p.regen += Meta.lvl('vitality') * 0.2;
       p.revives = Meta.lvl('revive');
       this.rerolls = 1 + Meta.lvl('luck');
+      this.banishes = 3;
+      this.banished = {};
 
       // apply character modifiers
       const m = ch.mods || {};
@@ -1657,8 +1659,10 @@
       // evolutions take priority — they are the payoff of a build
       const evos = [];
       for (const id in EVOLUTIONS) if (this.isEvolveReady(id)) evos.push({ kind: 'evolve', id });
+      const banned = this.banished || {};
       // weapon upgrades / new weapons
       for (const id in WEAPONS) {
+        if (banned['w:' + id]) continue;
         const w = WEAPONS[id];
         const cur = this.weapons[id] || 0;
         if (cur === 0) {
@@ -1670,6 +1674,7 @@
       }
       // passives
       for (const id in PASSIVES) {
+        if (banned['p:' + id]) continue;
         const ps = PASSIVES[id];
         const cur = this.passives[id] || 0;
         if (cur < ps.max) pool.push({ kind: 'passive', id, lvl: cur, isNew: cur === 0 });
@@ -1695,6 +1700,9 @@
       const out = this.rerolls <= 0;
       rb.style.opacity = out ? '0.4' : '1';
       rb.style.pointerEvents = out ? 'none' : 'auto';
+      const bc = document.getElementById('banish-count');
+      if (bc) bc.textContent = this.banishes || 0;
+      document.getElementById('banish-hint').style.opacity = (this.banishes > 0) ? '1' : '0.4';
       this._luChoices.forEach(c => {
         const card = document.createElement('div');
         card.className = 'lu-card';
@@ -1730,8 +1738,28 @@
         card.innerHTML = `<div class="ic" style="color:${color}">${ic}</div>
           <div class="nm">${nm}</div><div class="lvl">${lvlText}</div><div class="ds">${ds}</div>`;
         card.onclick = () => this.chooseUpgrade(c);
+        // banish button (weapon/passive only)
+        if (this.banishes > 0) {
+          const bx = document.createElement('button');
+          bx.className = 'lu-banish';
+          bx.textContent = '✕';
+          bx.title = 'Banish this option for the rest of the run';
+          bx.onclick = (e) => { e.stopPropagation(); this.banishOption(c); };
+          card.appendChild(bx);
+        }
         cont.appendChild(card);
       });
+    },
+
+    banishOption(c) {
+      if (this.banishes <= 0) return;
+      const key = c.kind === 'weapon' ? 'w:' + c.id : c.kind === 'passive' ? 'p:' + c.id : null;
+      if (!key) return;
+      this.banished[key] = 1;
+      this.banishes--;
+      Sound.select();
+      this._luChoices = this.rollChoices();
+      this.renderLevelUp();
     },
 
     reroll() {

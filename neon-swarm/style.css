@@ -208,6 +208,17 @@ html, body {
 .lu-card .nm { font-weight: 800; font-size: 16px; letter-spacing: 1px; }
 .lu-card .lvl { font-size: 12px; font-weight: 700; color: var(--gold); }
 .lu-card .ds { font-size: 13px; color: #a9c0e0; line-height: 1.35; }
+.lu-card { position: relative; }
+.lu-banish {
+  position: absolute; top: 6px; right: 6px;
+  width: 26px; height: 26px; line-height: 1; font-size: 13px; font-weight: 900;
+  color: #ff8aa3; background: rgba(40,10,20,0.7);
+  border: 1px solid rgba(255,77,109,0.4); border-radius: 7px; cursor: pointer; z-index: 2;
+}
+.lu-banish:hover { background: rgba(255,77,109,0.3); color: #fff; }
+#lu-actions { display: flex; align-items: center; gap: 16px; }
+#banish-hint { color: #9fb4d6; font-size: 13px; font-weight: 700; }
+#banish-count { color: #ff8aa3; }
 .lu-card.evo { border-color: var(--neon2); box-shadow: 0 0 22px rgba(255,43,214,0.35); }
 .lu-card.evo .nm { color: var(--neon2); }
 .tag-new { font-size: 10px; font-weight: 800; color: #03121a; background: var(--gold); padding: 1px 7px; border-radius: 6px; }
