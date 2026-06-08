@@ -678,6 +678,9 @@
       // combo decay
       if (this.comboTimer > 0) { this.comboTimer -= dt; if (this.comboTimer <= 0) this.combo = 0; }
 
+      // music intensity ramps with run time
+      Sound.intensity = clamp(this.time / 300, 0, 1);
+
       // regen + timers
       if (p.regen > 0 && p.hp < p.maxHp) p.hp = Math.min(p.maxHp, p.hp + p.regen * dt);
       if (p.invuln > 0) p.invuln -= dt;
@@ -1402,6 +1405,10 @@
       const cont = document.getElementById('lu-cards');
       cont.innerHTML = '';
       document.getElementById('reroll-count').textContent = this.rerolls;
+      const rb = document.getElementById('lu-reroll');
+      const out = this.rerolls <= 0;
+      rb.style.opacity = out ? '0.4' : '1';
+      rb.style.pointerEvents = out ? 'none' : 'auto';
       this._luChoices.forEach(c => {
         const card = document.createElement('div');
         card.className = 'lu-card';

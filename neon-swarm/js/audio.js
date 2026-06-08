@@ -11,6 +11,7 @@
     muted: false,
     _musicTimer: null,
     _step: 0,
+    intensity: 0, // 0..1, ramps music tempo
 
     init() {
       if (this.ctx) return;
@@ -121,8 +122,11 @@
         const a = arp[this._step % arp.length];
         this.tone(a, 0.14, 'sawtooth', 0.05, this.musicGain);
         if (this._step % 8 === 0) this.noise(0.04, 0.06, 4000); // hat
+        // extra off-beat hat as intensity rises
+        if (this.intensity > 0.5 && this._step % 2 === 1) this.noise(0.02, 0.04, 5000);
         this._step++;
-        this._musicTimer = setTimeout(tick, 150);
+        const delay = 165 - this.intensity * 55; // 165ms -> 110ms as tension rises
+        this._musicTimer = setTimeout(tick, delay);
       };
       tick();
     },
