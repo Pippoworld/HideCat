@@ -266,7 +266,7 @@
     canvas: null, ctx: null, W: 0, H: 0, DPR: 1,
     state: 'menu', // menu, playing, levelup, pause, gameover, shop, howto
     player: null,
-    enemies: [], bullets: [], gems: [], coins: [], particles: [], dmgTexts: [], zones: [], orbiters: [], booms: [],
+    enemies: [], bullets: [], gems: [], coins: [], particles: [], dmgTexts: [], zones: [], orbiters: [], booms: [], pickups: [],
     cam: { x: 0, y: 0, shake: 0 },
     time: 0, kills: 0, runCoins: 0,
     weapons: {}, // id -> level
@@ -431,7 +431,7 @@
       Meta.data.lastChar = this.charId; Meta.save();
       this.player = new Player();
       this.enemies = []; this.bullets = []; this.gems = []; this.coins = [];
-      this.particles = []; this.dmgTexts = []; this.zones = []; this.orbiters = []; this.booms = [];
+      this.particles = []; this.dmgTexts = []; this.zones = []; this.orbiters = []; this.booms = []; this.pickups = [];
       this.cam = { x: 0, y: 0, shake: 0 };
       this.time = 0; this.kills = 0; this.runCoins = 0;
       this.weapons = {}; this.weapons[ch.weapon] = 1;
@@ -957,9 +957,10 @@
       d = Math.round(d);
       e.hp -= d;
       e.flash = 0.08;
-      this.spawnDmgText(e.x, e.y - e.r, d, crit, color);
+      // thin out damage numbers when the screen is busy (keep crits)
+      if (crit || this.dmgTexts.length < 45) this.spawnDmgText(e.x, e.y - e.r, d, crit, color);
       // small hit particles
-      if (Math.random() < 0.5) this.spawnParticles(fx, fy, color, 2);
+      if (Math.random() < 0.4) this.spawnParticles(fx, fy, color, 2);
       if (e.hp <= 0) {
         const idx = this.enemies.indexOf(e);
         if (idx >= 0) this.killEnemy(idx, false);
@@ -979,6 +980,14 @@
       // drop coin sometimes
       if (Math.random() < (e.coin || 0.1)) {
         this.coins.push({ x: e.x + rand(-8, 8), y: e.y + rand(-8, 8), v: e.boss ? 10 : 1, r: 6, pulled: false, vx: rand(-30, 30), vy: rand(-30, 30) });
+      }
+      // special pickups
+      if (e.boss) {
+        this.spawnPickup(e.x, e.y, 'chest');
+      } else {
+        const r = Math.random();
+        if (r < 0.010) this.spawnPickup(e.x, e.y, 'heal');
+        else if (r < 0.016) this.spawnPickup(e.x, e.y, Math.random() < 0.5 ? 'magnet' : 'bomb');
       }
       if (exploded) {
         // bomber explosion damages nearby enemies + player handled in touch
@@ -1079,6 +1088,52 @@
           c.x += c.vx * dt; c.y += c.vy * dt; c.vx *= 0.9; c.vy *= 0.9;
         }
       }
+      // special pickups (heal / magnet / bomb / chest)
+      for (let i = this.pickups.length - 1; i >= 0; i--) {
+        const k = this.pickups[i];
+        k.bob += dt * 4;
+        const dd = dist2(k.x, k.y, p.x, p.y);
+        if (dd < pr2) { const dx = p.x - k.x, dy = p.y - k.y, d = Math.hypot(dx, dy) || 1; k.x += dx / d * 220 * dt; k.y += dy / d * 220 * dt; }
+        const cr = p.r + k.r + 6;
+        if (dd < cr * cr) { this.applyPickup(k); this.pickups.splice(i, 1); }
+      }
+    },
+
+    spawnPickup(x, y, kind) {
+      this.pickups.push({ x, y, kind, r: 15, bob: Math.random() * TAU });
+    },
+
+    applyPickup(k) {
+      const p = this.player;
+      switch (k.kind) {
+        case 'heal':
+          p.hp = Math.min(p.maxHp, p.hp + p.maxHp * 0.25);
+          this.spawnParticles(p.x, p.y, '#4dff9e', 18);
+          Sound.levelup(); this.banner('+25% HP'); break;
+        case 'magnet':
+          for (const g of this.gems) g.pulled = true;
+          this.spawnParticles(p.x, p.y, '#9af6ff', 14);
+          Sound.coin(); this.banner('🧲 MAGNET'); break;
+        case 'bomb':
+          this.screenBomb(); break;
+        case 'chest':
+          this.runCoins += Math.round(25 * p.coinMul);
+          this.pendingLevels++;
+          Sound.evolve(); this.banner('🎁 SUPPLY DROP');
+          this.maybeShowLevelUp(); break;
+      }
+    },
+
+    screenBomb() {
+      this.shake(16); Sound.boss();
+      const targets = [];
+      for (const e of this.enemies) {
+        const sx = e.x - this.cam.x, sy = e.y - this.cam.y;
+        if (sx > -60 && sx < this.W + 60 && sy > -60 && sy < this.H + 60) targets.push(e);
+      }
+      for (const e of targets) if (e.hp > 0) this.damageEnemy(e, 250, e.x, e.y, '#ff7a3c');
+      this.spawnParticles(this.player.x, this.player.y, '#ff7a3c', 30);
+      this.banner('💥 OVERLOAD');
     },
 
     gainXP(amount) {
@@ -1270,6 +1325,21 @@
       }
     },
 
+    drawDangerVignette(ctx) {
+      const p = this.player;
+      if (!p) return;
+      const ratio = p.hp / p.maxHp;
+      if (ratio >= 0.33) return;
+      const intensity = 1 - ratio / 0.33;
+      const pulse = 0.5 + 0.5 * Math.sin(this.time * 6);
+      const a = 0.16 + intensity * 0.4 * pulse;
+      const grd = ctx.createRadialGradient(this.W / 2, this.H / 2, this.H * 0.22, this.W / 2, this.H / 2, this.W * 0.8);
+      grd.addColorStop(0, 'rgba(255,30,60,0)');
+      grd.addColorStop(1, `rgba(255,20,50,${a})`);
+      ctx.fillStyle = grd;
+      ctx.fillRect(0, 0, this.W, this.H);
+    },
+
     _banner: null,
     banner(text) { this._banner = { text, life: 1.8 }; },
 
@@ -1305,6 +1375,19 @@
         ctx.fillStyle = '#ffd84d';
         ctx.beginPath(); ctx.arc(c.x, c.y, c.r, 0, TAU); ctx.fill();
         ctx.strokeStyle = '#fff7d0'; ctx.lineWidth = 1.5; ctx.stroke();
+      }
+      // special pickups
+      if (this.pickups.length) {
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.font = '26px system-ui, sans-serif';
+        for (const k of this.pickups) {
+          const yy = k.y + Math.sin(k.bob) * 3;
+          ctx.globalCompositeOperation = 'lighter';
+          const col = k.kind === 'heal' ? 'rgba(77,255,158,0.4)' : k.kind === 'chest' ? 'rgba(255,216,77,0.4)' : k.kind === 'bomb' ? 'rgba(255,122,60,0.4)' : 'rgba(154,246,255,0.4)';
+          ctx.fillStyle = col; ctx.beginPath(); ctx.arc(k.x, yy, 18, 0, TAU); ctx.fill();
+          ctx.globalCompositeOperation = 'source-over';
+          ctx.fillText(k.kind === 'heal' ? '❤️' : k.kind === 'magnet' ? '🧲' : k.kind === 'bomb' ? '💣' : '🎁', k.x, yy);
+        }
+        ctx.textBaseline = 'alphabetic';
       }
 
       // zones (nova rings)
@@ -1362,6 +1445,9 @@
       ctx.globalAlpha = 1;
 
       ctx.restore();
+
+      // low-HP danger vignette (screen space)
+      this.drawDangerVignette(ctx);
 
       // joystick (screen space)
       this.drawJoystick(ctx);
