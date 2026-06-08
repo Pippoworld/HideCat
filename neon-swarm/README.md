@@ -29,14 +29,25 @@ Works great on desktop and mobile (responsive canvas, touch controls, installabl
 ## ✨ Features
 
 - **6 weapons** — Pulse Blaster, Orbit Blades, Shock Nova, Tesla Coil, Scatter Gun, Boomerang
-- **9 passives** that reshape your build
-- **6 weapon evolutions** — max a weapon + its paired passive to unlock a super-weapon
+- **9 passives** + **6 weapon evolutions** — max a weapon + its paired passive to unlock a super-weapon
+- **Banish & reroll** — curate the upgrade pool to craft focused builds
 - **5 unlockable pilots**, each with distinct stats and a starting weapon
+- **3 difficulty modes** with score multipliers (Easy / Normal / Hard)
+- **7 enemy types** (grunt, swift, tank, bomber, splitter, brute, ranged shooter) and **3 boss archetypes** (Charger, Artillery, Summoner)
 - **Pickups** — heal, magnet, screen-clearing bomb, and boss supply drops
-- **Meta progression** — earn coins, buy permanent upgrades, persist across runs
-- **Score, combo multiplier, and a local top-5 leaderboard**
-- **Boss waves**, escalating difficulty, screen shake, particles, danger feedback
-- **Synthesized audio** (SFX + procedural music) — zero audio files
+- **Meta progression** — coins, 10 permanent upgrades, 10 achievements, lifetime stats
+- **Daily Challenge** — a seeded daily run with rotating modifiers and its own leaderboard
+- **Score, combo multiplier, and a local best-runs leaderboard**
+- **Settings & accessibility** — music/SFX volume, screen-shake & damage-number toggles, low-quality mode, reset progress
+- **Synthesized audio** (SFX + procedural, intensity-ramping music) — zero audio files
+
+## 🏗 Commercial-readiness
+
+- **Monetization seam** (`js/ads.js`): rewarded continue, interstitials, gameplay hooks — one place to wire Poki/CrazyGames
+- **Analytics seam** (`js/analytics.js`): run/evolve/achievement/error events — wire GA4/Plausible/portal
+- **Robustness**: crash-resilient game loop, corrupt/partial-save recovery, bounded memory
+- **Performance**: spatial-hash collisions, automatic low-end quality scaling, 60fps with 280+ enemies
+- **Mobile**: touch joystick, responsive canvas, installable PWA, iOS audio unlock, no PII
 
 ---
 
@@ -66,6 +77,7 @@ neon-swarm/
   js/
     audio.js        # synthesized WebAudio SFX + procedural music
     ads.js          # monetization seam (portal SDK integration point)
+    analytics.js    # telemetry seam (GA4/Plausible/portal)
     input.js        # keyboard + touch joystick
     game.js         # engine: entities, weapons, evolutions, spawning, render
   *.js              # headless Playwright test/scene harnesses (dev only)
@@ -73,12 +85,15 @@ neon-swarm/
 
 ## 🧪 Dev tooling
 
-Headless smoke / performance / balance harnesses (require a Chromium via Playwright):
+Headless harnesses (require a Chromium via Playwright):
 
 ```bash
-node smoketest.js     # boots a run, plays, asserts no errors
-node perftest.js      # update() cost under heavy load (300+ enemies)
-node balancetest.js   # a dodging AI plays a full run; prints the difficulty timeline
+node smoketest.js                 # boots a run, plays, asserts no page errors
+node uitest.js                    # 23-check end-to-end UI flow test
+node perftest.js                  # update() cost under heavy load (300+ enemies)
+node evotest.js                   # validates evolution gating + runtime
+node balancetest.js               # an AI plays a full run; prints the difficulty timeline
+DIFF=hard PILOT=striker node balancetest.js   # per-difficulty / per-pilot balance
 ```
 
 ---
