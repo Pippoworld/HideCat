@@ -1040,10 +1040,11 @@
       p.hitFlash = 0.25;
       this.shake(6);
       Sound.hurt();
-      if (p.hp < 0) p.hp = 0;
+      if (p.hp <= 0) { p.hp = 0; this.onDeath(); }
     },
 
     onDeath() {
+      if (this.state !== 'playing') return; // never double-fire
       const p = this.player;
       if (p.revives > 0) {
         p.revives--;
