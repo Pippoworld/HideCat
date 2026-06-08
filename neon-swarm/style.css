@@ -211,6 +211,23 @@ html, body {
 .shop-card button:disabled { background: #2a3350; color: #6a7799; cursor: default; }
 #shop-coins { color: var(--gold); font-weight: 800; font-size: 20px; }
 
+/* ---------- Awards ---------- */
+#awards-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 12px; width: min(720px, 94vw); max-height: 58vh; overflow-y: auto; padding: 4px;
+}
+#awards-progress { color: var(--gold); font-weight: 700; }
+.award-card {
+  background: var(--panel); border: 2px solid rgba(120,140,180,0.25);
+  border-radius: 12px; padding: 12px; text-align: center;
+  display: flex; flex-direction: column; gap: 5px; align-items: center; opacity: 0.55;
+}
+.award-card.got { opacity: 1; border-color: rgba(255,216,77,0.55); box-shadow: 0 0 16px rgba(255,216,77,0.18); }
+.award-card .ic { font-size: 28px; }
+.award-card .nm { font-weight: 800; font-size: 14px; }
+.award-card .ds { font-size: 11px; color: #a9c0e0; min-height: 28px; }
+.award-card .rw { font-size: 11px; color: var(--gold); font-weight: 700; }
+
 /* ---------- Character select ---------- */
 #char-grid {
   display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));

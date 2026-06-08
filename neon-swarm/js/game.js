@@ -20,13 +20,14 @@
   // ---------------------------------------------------------------- meta save
   const SAVE_KEY = 'neonswarm_save_v1';
   const Meta = {
-    data: { coins: 0, best: 0, bestTime: 0, runs: 0, totalKills: 0, upgrades: {}, chars: { vanguard: 1 }, muted: 0, lastChar: 'vanguard', scores: [] },
+    data: { coins: 0, best: 0, bestTime: 0, runs: 0, totalKills: 0, bossKills: 0, coinsEarned: 0, upgrades: {}, chars: { vanguard: 1 }, achievements: {}, muted: 0, lastChar: 'vanguard', scores: [] },
     load() {
       try {
         const s = JSON.parse(localStorage.getItem(SAVE_KEY));
         if (s) this.data = Object.assign(this.data, s);
         if (!this.data.upgrades) this.data.upgrades = {};
         if (!this.data.chars) this.data.chars = { vanguard: 1 };
+        if (!this.data.achievements) this.data.achievements = {};
       } catch (e) {}
     },
     save() {
@@ -35,6 +36,20 @@
     lvl(id) { return this.data.upgrades[id] || 0; },
     hasChar(id) { return !!this.data.chars[id]; },
   };
+
+  // ---------------------------------------------------------------- achievements
+  const ACHIEVEMENTS = [
+    { id: 'first100', ic: '☠️', nm: 'First Blood', ds: 'Kill 100 enemies (lifetime)', reward: 25, check: s => s.totalKills >= 100 },
+    { id: 'evolve1', ic: '⚡', nm: 'Transcend', ds: 'Evolve a weapon', reward: 50, check: s => s.evolved >= 1 },
+    { id: 'combo50', ic: '🔥', nm: 'Combo Master', ds: 'Reach a 50x combo', reward: 50, check: s => s.combo >= 50 },
+    { id: 'survive3', ic: '⏱️', nm: 'Survivor', ds: 'Survive 3 minutes', reward: 50, check: s => s.time >= 180 },
+    { id: 'kills500', ic: '💀', nm: 'Slayer', ds: '500 kills in one run', reward: 50, check: s => s.kills >= 500 },
+    { id: 'level30', ic: '📈', nm: 'Ascendant', ds: 'Reach level 30 in a run', reward: 75, check: s => s.level >= 30 },
+    { id: 'boss5', ic: '👹', nm: 'Boss Hunter', ds: 'Defeat 5 bosses (lifetime)', reward: 75, check: s => s.bossKills >= 5 },
+    { id: 'survive5', ic: '🏅', nm: 'Veteran', ds: 'Survive 5 minutes', reward: 100, check: s => s.time >= 300 },
+    { id: 'kills2000', ic: '☢️', nm: 'Exterminator', ds: '2000 kills in one run', reward: 100, check: s => s.kills >= 2000 },
+    { id: 'allpilots', ic: '🛸', nm: 'Full Roster', ds: 'Unlock every pilot', reward: 100, check: s => s.allPilots },
+  ];
 
   // ---------------------------------------------------------------- characters
   const CHARACTERS = [
@@ -318,6 +333,8 @@
       const $ = (id) => document.getElementById(id);
       $('play-btn').onclick = () => { Sound.init(); Sound.resume(); this.showCharSelect(); };
       $('upgrades-btn').onclick = () => this.showShop();
+      $('awards-btn').onclick = () => this.showAwards();
+      $('awards-back').onclick = () => this.showMenu();
       $('how-btn').onclick = () => { this.hideAll(); $('howto').classList.remove('hidden'); };
       $('howto-back').onclick = () => this.showMenu();
       $('shop-back').onclick = () => this.showMenu();
@@ -382,7 +399,7 @@
     },
 
     hideAll() {
-      ['menu', 'levelup', 'pause', 'gameover', 'shop', 'howto', 'charselect'].forEach(id => document.getElementById(id).classList.add('hidden'));
+      ['menu', 'levelup', 'pause', 'gameover', 'shop', 'howto', 'charselect', 'awards'].forEach(id => document.getElementById(id).classList.add('hidden'));
       document.getElementById('hud').classList.add('hidden');
     },
 
@@ -402,6 +419,24 @@
       this.hideAll();
       document.getElementById('shop').classList.remove('hidden');
       this.renderShop();
+    },
+
+    showAwards() {
+      this.state = 'awards';
+      this.hideAll();
+      document.getElementById('awards').classList.remove('hidden');
+      const got = ACHIEVEMENTS.filter(a => Meta.data.achievements[a.id]).length;
+      document.getElementById('awards-progress').textContent = `${got} / ${ACHIEVEMENTS.length} unlocked`;
+      const grid = document.getElementById('awards-grid');
+      grid.innerHTML = '';
+      ACHIEVEMENTS.forEach(a => {
+        const has = !!Meta.data.achievements[a.id];
+        const card = document.createElement('div');
+        card.className = 'award-card' + (has ? ' got' : '');
+        card.innerHTML = `<div class="ic">${has ? a.ic : '🔒'}</div><div class="nm">${a.nm}</div>` +
+          `<div class="ds">${a.ds}</div><div class="rw">◈ ${a.reward}</div>`;
+        grid.appendChild(card);
+      });
     },
 
     renderShop() {
@@ -497,6 +532,7 @@
       const p = this.player;
       Meta.data.runs++;
       Meta.data.coins += this.runCoins;
+      Meta.data.coinsEarned = (Meta.data.coinsEarned || 0) + this.runCoins;
       Meta.data.totalKills = (Meta.data.totalKills || 0) + this.kills;
       // final score = combat score + survival/level/coin bonuses
       this.finalScore = (this.score || 0) + Math.floor(this.time) * 8 + p.level * 200 + this.runCoins * 2;
@@ -518,7 +554,29 @@
         if (c.unlock.type === 'level' && p.level >= c.unlock.amt) { Meta.data.chars[c.id] = 1; this._newUnlocks.push(c); }
         if (c.unlock.type === 'time' && this.time >= c.unlock.amt) { Meta.data.chars[c.id] = 1; this._newUnlocks.push(c); }
       });
+      this._newAwards = this.checkAchievements();
       Meta.save();
+    },
+
+    checkAchievements() {
+      const p = this.player;
+      const stats = {
+        kills: this.kills, time: this.time, level: p ? p.level : 0,
+        combo: this.bestCombo || 0, evolved: Object.keys(this.evolved || {}).length,
+        totalKills: Meta.data.totalKills || 0, bossKills: Meta.data.bossKills || 0,
+        coinsEarned: Meta.data.coinsEarned || 0,
+        allPilots: CHARACTERS.every(c => Meta.hasChar(c.id)),
+      };
+      const newly = [];
+      for (const a of ACHIEVEMENTS) {
+        if (Meta.data.achievements[a.id]) continue;
+        if (a.check(stats)) {
+          Meta.data.achievements[a.id] = 1;
+          Meta.data.coins += a.reward;
+          newly.push(a);
+        }
+      }
+      return newly;
     },
 
     // recompute mirrored multipliers used by weapon code
@@ -1062,7 +1120,7 @@
       this.score += Math.round((e.xp * 10 + (e.boss ? 2000 : 0)) * this.comboMult());
       this.spawnParticles(e.x, e.y, e.color, e.boss ? 30 : 7);
       Sound.kill();
-      if (e.boss) { this.shake(10); this.banner('BOSS DOWN!'); }
+      if (e.boss) { this.shake(10); this.banner('BOSS DOWN!'); Meta.data.bossKills = (Meta.data.bossKills || 0) + 1; }
       // drop xp gem
       this.gems.push({ x: e.x, y: e.y, xp: e.xp, vx: rand(-40, 40), vy: rand(-40, 40), r: 4 + Math.min(6, e.xp), pulled: false });
       // drop coin sometimes
@@ -1147,6 +1205,12 @@
       if (this._newUnlocks && this._newUnlocks.length) {
         html += '<br><br><span style="color:var(--neon2);font-weight:800">★ PILOT UNLOCKED</span><br>' +
           this._newUnlocks.map(c => `${c.ic} ${c.nm}`).join(' · ');
+        Sound.evolve();
+      }
+      if (this._newAwards && this._newAwards.length) {
+        const total = this._newAwards.reduce((s, a) => s + a.reward, 0);
+        html += `<br><br><span style="color:var(--gold);font-weight:800">🏆 AWARD${this._newAwards.length > 1 ? 'S' : ''} (+◈${total})</span><br>` +
+          this._newAwards.map(a => `${a.ic} ${a.nm}`).join(' · ');
         Sound.evolve();
       }
       document.getElementById('go-stats').innerHTML = html;
@@ -1468,7 +1532,7 @@
       ctx.fillStyle = '#05060f';
       ctx.fillRect(0, 0, this.W, this.H);
 
-      if (this.state === 'menu' || this.state === 'shop' || this.state === 'howto' || this.state === 'charselect') {
+      if (this.state === 'menu' || this.state === 'shop' || this.state === 'howto' || this.state === 'charselect' || this.state === 'awards') {
         this.renderMenuBg();
         return;
       }
