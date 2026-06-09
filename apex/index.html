@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0a0710">
+<title>APEX · 绝巅</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="root">
+  <canvas id="game"></canvas>
+
+  <!-- HUD -->
+  <div id="hud" class="hidden">
+    <div id="hp-wrap"><div id="hp-fill"></div><span id="hp-text"></span></div>
+    <div id="hud-top">
+      <span id="stage-label">山脚</span>
+      <span id="room-timer">0:00</span>
+      <span id="dash-pips"></span>
+    </div>
+    <div id="rival-bar-wrap" class="hidden"><span id="rival-name">宿敌</span><div id="rival-bar"><div id="rival-fill"></div></div></div>
+    <button id="pause-btn" aria-label="暂停">❚❚</button>
+    <!-- touch controls -->
+    <div id="touch-dash" class="touch-btn hidden">闪</div>
+  </div>
+
+  <!-- Main menu -->
+  <div id="menu" class="overlay">
+    <h1 class="logo">APEX<span>绝巅</span></h1>
+    <p class="tagline">从山脚杀到山顶，闪避是你的命。击败宿敌，登神。</p>
+    <div class="buttons">
+      <button id="play-btn" class="btn primary">开始登顶</button>
+      <button id="how-btn" class="btn">怎么玩</button>
+    </div>
+    <div id="best-line"></div>
+  </div>
+
+  <!-- Blessing choose -->
+  <div id="bless" class="overlay hidden">
+    <h2 class="bl-title">✦ 祝福</h2>
+    <p class="bl-sub">三选一，永久叠加</p>
+    <div id="bless-cards"></div>
+  </div>
+
+  <!-- Pause -->
+  <div id="pause" class="overlay hidden">
+    <h2>已暂停</h2>
+    <div id="pause-build"></div>
+    <div class="buttons">
+      <button id="resume-btn" class="btn primary">继续</button>
+      <button id="quit-btn" class="btn">退出到菜单</button>
+    </div>
+  </div>
+
+  <!-- Game over -->
+  <div id="over" class="overlay hidden">
+    <h2 id="over-title">登顶失败</h2>
+    <div id="over-stats"></div>
+    <div class="buttons">
+      <button id="retry-btn" class="btn primary">再来一次</button>
+      <button id="menu-btn" class="btn">菜单</button>
+    </div>
+  </div>
+
+  <!-- How to play -->
+  <div id="howto" class="overlay hidden">
+    <h2>怎么玩</h2>
+    <ul class="howlist">
+      <li><b>移动</b>：WASD / 方向键（手机：左侧拖动）</li>
+      <li><b>攻击</b>：鼠标左键朝准星方向挥砍（手机：自动朝最近敌人）</li>
+      <li><b>冲刺闪避</b>：空格 / 右键（手机：右下「闪」键）——冲刺瞬间无敌，穿过攻击！</li>
+      <li>清光房间 → 出口开启 → 站上传送门上一层</li>
+      <li>每层之间<b>三选一祝福</b>，越叠越强</li>
+      <li>中途被打倒不会死，原地复活；<b>只有山顶决斗会真死</b></li>
+      <li>山顶有<b>缩圈风暴</b>，逼你正面击杀宿敌</li>
+    </ul>
+    <button id="howto-back" class="btn">返回</button>
+  </div>
+</div>
+
+<script src="js/audio.js"></script>
+<script src="js/input.js"></script>
+<script src="js/game.js"></script>
+</body>
+</html>
