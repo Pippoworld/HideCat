@@ -1,41 +1,225 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>猫猫移动游戏</title>
-    <style>
-        body {
-            margin: 0;
-            padding: 0;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            font-family: Arial, sans-serif;
-        }
-        #gameCanvas {
-            border: 3px solid #fff;
-            border-radius: 10px;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
-            cursor: pointer;
-            background: linear-gradient(to bottom, #87CEEB 0%, #98FB98 100%);
-        }
-        .info {
-            position: absolute;
-            top: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            color: white;
-            font-size: 18px;
-            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
-        }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HideCat · 猫咪夜逃</title>
+<style>
+    :root{
+        --ink:#0d1022; --panel:rgba(16,20,40,.82); --edge:rgba(255,255,255,.10);
+        --primary:#6c8cff; --primary2:#8aa0ff; --gold:#ffcc4d; --safe:#5fd98a; --danger:#ff5d5d;
+        --text:#eaeefc; --muted:#9aa3c4;
+        --font: -apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;
+    }
+    *{margin:0;padding:0;box-sizing:border-box}
+    html,body{height:100%}
+    body{
+        display:flex;justify-content:center;align-items:center;min-height:100vh;
+        background:radial-gradient(1200px 700px at 50% -10%, #20264a 0%, #0a0d1e 60%, #06080f 100%);
+        font-family:var(--font);color:var(--text);overflow:hidden;
+    }
+    #gameContainer{
+        position:relative;width:1280px;height:720px;max-width:100vw;max-height:100vh;
+        background:#080a16;border-radius:18px;overflow:hidden;
+        box-shadow:0 30px 80px rgba(0,0,0,.6),0 0 0 1px rgba(255,255,255,.05);
+    }
+    #gameCanvas{display:block;width:100%;height:100%;cursor:crosshair}
+
+    /* ---------- 通用面板/按钮 ---------- */
+    .btn-primary,.btn-ghost,.menu-btn{
+        font-family:var(--font);font-weight:700;cursor:pointer;border:none;border-radius:14px;
+        transition:transform .15s ease,box-shadow .15s ease,background .15s ease;
+    }
+    .btn-primary{
+        padding:14px 30px;font-size:17px;color:#fff;
+        background:linear-gradient(135deg,var(--primary) 0%,#7b6cff 100%);
+        box-shadow:0 8px 24px rgba(108,140,255,.4);
+    }
+    .btn-primary:hover{transform:translateY(-2px)}
+    .btn-primary:active{transform:translateY(0)}
+    .btn-ghost{
+        padding:14px 26px;font-size:16px;color:var(--text);
+        background:rgba(255,255,255,.08);border:1px solid var(--edge);
+    }
+    .btn-ghost:hover{background:rgba(255,255,255,.16)}
+
+    /* ---------- 主菜单 ---------- */
+    .screen{
+        position:absolute;inset:0;z-index:50;display:flex;flex-direction:column;
+        justify-content:center;align-items:center;
+        background:radial-gradient(900px 600px at 50% 30%, #1b2247 0%, #0a0d1e 70%);
+    }
+    .screen.hidden{display:none}
+    .logo{font-size:64px;font-weight:800;letter-spacing:2px;
+        background:linear-gradient(135deg,#fff 0%,#ffd27a 60%,#ffb35a 100%);
+        -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
+        filter:drop-shadow(0 6px 20px rgba(255,180,90,.25));
+    }
+    .logo .paw{-webkit-text-fill-color:initial}
+    .tagline{color:var(--muted);font-size:17px;margin-top:10px;letter-spacing:1px}
+    .menu-actions{margin-top:42px;display:flex;flex-direction:column;gap:14px;width:280px}
+    .menu-actions .btn-primary,.menu-actions .btn-ghost{width:100%;text-align:center}
+    .credits{position:absolute;bottom:18px;color:var(--muted);font-size:12px;opacity:.7}
+    .floaty{position:absolute;font-size:30px;opacity:.18;animation:floaty 7s ease-in-out infinite}
+    @keyframes floaty{0%,100%{transform:translateY(0)}50%{transform:translateY(-16px)}}
+
+    /* ---------- 关卡选择 ---------- */
+    .ls-title{font-size:34px;font-weight:800;margin-bottom:6px}
+    .ls-sub{color:var(--muted);margin-bottom:28px}
+    .level-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:16px;max-width:920px;padding:0 20px}
+    .level-card{
+        position:relative;background:linear-gradient(160deg,rgba(255,255,255,.08),rgba(255,255,255,.03));
+        border:1px solid var(--edge);border-radius:16px;padding:18px 14px;cursor:pointer;text-align:center;
+        transition:transform .18s ease,border-color .18s ease,box-shadow .18s ease;overflow:hidden;
+    }
+    .level-card:hover{transform:translateY(-6px);border-color:var(--primary);box-shadow:0 16px 40px rgba(108,140,255,.28)}
+    .level-card .num{font-size:13px;color:var(--gold);font-weight:800;letter-spacing:1px}
+    .level-card .lname{font-size:18px;font-weight:800;margin:8px 0}
+    .level-card .diff{font-size:12px;color:var(--muted)}
+    .level-card .pip{display:inline-block;width:7px;height:7px;border-radius:50%;background:#3a4166;margin:0 2px}
+    .level-card .pip.on{background:var(--danger)}
+    .level-thumb{height:54px;border-radius:10px;margin-bottom:10px;border:1px solid var(--edge)}
+
+    /* ---------- HUD ---------- */
+    .menu-btn{
+        position:absolute;top:16px;left:16px;z-index:30;padding:10px 16px;font-size:14px;color:var(--text);
+        background:var(--panel);border:1px solid var(--edge);backdrop-filter:blur(8px);
+    }
+    .menu-btn:hover{background:rgba(255,255,255,.16)}
+    .hud{position:absolute;top:62px;left:16px;z-index:20;display:flex;flex-direction:column;gap:10px}
+    .hud-item{display:flex;align-items:center;gap:10px;background:var(--panel);border:1px solid var(--edge);
+        border-radius:14px;padding:7px 12px;backdrop-filter:blur(8px);width:max-content}
+    .hud .icon{font-size:16px}
+    .bar{width:170px;height:14px;border-radius:8px;background:rgba(0,0,0,.35);padding:2px;overflow:hidden}
+    .bar > span{display:block;height:10px;border-radius:6px;transition:width .25s ease}
+    .health > span{background:linear-gradient(90deg,#ff6b6b,#ff9a8b)}
+    .stamina > span{background:linear-gradient(90deg,#51cf66,#8ce99a)}
+    .objective{font-size:13px;font-weight:700}
+    .tag{font-size:12px;font-weight:700;color:var(--gold)}
+
+    .minimap{position:absolute;top:16px;right:16px;width:170px;height:170px;z-index:20;
+        background:var(--panel);border:1px solid var(--edge);border-radius:16px;padding:10px;
+        backdrop-filter:blur(8px);display:none}
+    .minimap.show{display:block}
+    #minimapCanvas{width:150px;height:150px;border-radius:8px}
+    .minimap .mm-label{position:absolute;bottom:6px;left:0;right:0;text-align:center;font-size:10px;color:var(--muted)}
+
+    .warning,.safe-tag{position:absolute;left:50%;transform:translateX(-50%);z-index:25;
+        padding:9px 20px;border-radius:20px;font-weight:800;font-size:14px;display:none}
+    .warning{top:84px;background:rgba(255,93,93,.95);color:#fff;box-shadow:0 6px 20px rgba(255,93,93,.5);
+        animation:shake .5s infinite}
+    .warning.show{display:block}
+    .safe-tag{top:84px;background:rgba(95,217,138,.95);color:#06210f;box-shadow:0 6px 20px rgba(95,217,138,.4)}
+    .safe-tag.show{display:block}
+    @keyframes shake{0%,100%{transform:translateX(-50%)}25%{transform:translateX(-52%)}75%{transform:translateX(-48%)}}
+
+    .controls{position:absolute;bottom:14px;left:50%;transform:translateX(-50%);z-index:20;
+        color:var(--muted);font-size:12px;background:var(--panel);border:1px solid var(--edge);
+        padding:7px 16px;border-radius:16px;backdrop-filter:blur(8px)}
+
+    /* ---------- 结算 ---------- */
+    .overlay{position:absolute;inset:0;z-index:60;display:none;justify-content:center;align-items:center;
+        background:rgba(4,6,14,.78);backdrop-filter:blur(4px)}
+    .overlay.show{display:flex;animation:fadeIn .3s ease}
+    @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+    .overlay-card{text-align:center;background:linear-gradient(160deg,rgba(28,34,66,.95),rgba(14,18,38,.95));
+        border:1px solid var(--edge);border-radius:22px;padding:42px 48px;box-shadow:0 30px 80px rgba(0,0,0,.6);
+        animation:pop .3s ease}
+    @keyframes pop{from{transform:scale(.9)}to{transform:scale(1)}}
+    .overlay-card h2{font-size:40px;margin-bottom:12px}
+    .overlay-card p{color:var(--muted);font-size:16px;margin-bottom:28px}
+    .overlay-card #gameOverButtons{display:flex;gap:14px;justify-content:center}
+    .overlay.win .overlay-card{box-shadow:0 0 0 1px rgba(95,217,138,.4),0 30px 80px rgba(0,0,0,.6)}
+    .overlay.lose .overlay-card{box-shadow:0 0 0 1px rgba(255,93,93,.35),0 30px 80px rgba(0,0,0,.6)}
+</style>
 </head>
 <body>
-    <div class="info">点击屏幕控制猫猫移动</div>
-    <canvas id="gameCanvas" width="800" height="600"></canvas>
-    <script src="game.js"></script>
+<div id="gameContainer">
+
+    <canvas id="gameCanvas" width="1280" height="720"></canvas>
+
+    <!-- 游戏内菜单按钮 -->
+    <button class="menu-btn" onclick="returnToMenu()">☰ 菜单</button>
+
+    <!-- HUD -->
+    <div class="hud">
+        <div class="hud-item"><span class="icon">❤️</span><div class="bar health"><span id="healthFill" style="width:100%"></span></div></div>
+        <div class="hud-item"><span class="icon">⚡</span><div class="bar stamina"><span id="staminaFill" style="width:100%"></span></div></div>
+        <div class="hud-item"><span class="icon">🎯</span><span class="objective" id="objective">🐱 猫咪　距出口 —</span></div>
+        <div class="hud-item"><span class="tag" id="levelTag">第 1 关</span></div>
+    </div>
+
+    <div class="minimap"><canvas id="minimapCanvas" width="150" height="150"></canvas><div class="mm-label">小地图 · M 键开关</div></div>
+
+    <div class="warning" id="warning">⚠️ 危险！野狗正在追击！</div>
+    <div class="safe-tag" id="safeTag">💡 安全区 · 野狗不会靠近</div>
+
+    <div class="controls">点击地面移动 · WASD/方向键 · Shift 奔跑 · Tab 切换猫/狗 · M 小地图 · ESC 菜单</div>
+
+    <!-- 结算 -->
+    <div class="overlay" id="gameOver">
+        <div class="overlay-card">
+            <h2 id="gameOverTitle">游戏结束</h2>
+            <p id="gameOverMessage">再试一次吧！</p>
+            <div id="gameOverButtons"></div>
+        </div>
+    </div>
+
+    <!-- 主菜单 -->
+    <div class="screen" id="mainMenu">
+        <div class="floaty" style="top:18%;left:16%">🐱</div>
+        <div class="floaty" style="top:26%;right:14%;animation-delay:1.5s">🐕</div>
+        <div class="floaty" style="bottom:20%;left:22%;animation-delay:3s">💡</div>
+        <div class="floaty" style="bottom:24%;right:20%;animation-delay:2s">🏢</div>
+        <h1 class="logo"><span class="paw">🐾</span> HideCat</h1>
+        <div class="tagline">猫咪夜逃 · 穿过小区，避开野狗，奔向安全出口</div>
+        <div class="menu-actions">
+            <button class="btn-primary" onclick="startLevel(1)">▶ 开始游戏</button>
+            <button class="btn-ghost" onclick="openLevelSelect()">关卡选择</button>
+        </div>
+        <div class="credits">扁平卡通矢量 · 程序化美术 · WASD/鼠标操作</div>
+    </div>
+
+    <!-- 关卡选择 -->
+    <div class="screen hidden" id="levelSelect">
+        <button class="menu-btn" style="position:absolute" onclick="backToMainMenu()">← 返回</button>
+        <div class="ls-title">选择关卡</div>
+        <div class="ls-sub">难度逐关递增：灯光更少、野狗更多</div>
+        <div class="level-grid" id="levelGrid"></div>
+    </div>
+
+</div>
+
+<script src="js/art.js"></script>
+<script src="js/world.js"></script>
+<script src="js/entities.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/main.js"></script>
+<script>
+    // 动态生成关卡卡片
+    (function(){
+        const grid = document.getElementById('levelGrid');
+        const thumbs = [
+            'linear-gradient(160deg,#3a4a86,#222a52)',
+            'linear-gradient(160deg,#3a6f5c,#244a3f)',
+            'linear-gradient(160deg,#5a4a86,#2e2552)',
+            'linear-gradient(160deg,#86684a,#523f25)',
+            'linear-gradient(160deg,#2a2f52,#12162c)'
+        ];
+        Object.keys(HC.LEVELS).forEach((k,i)=>{
+            const lv = HC.LEVELS[k];
+            const pips = [1,2,3,4,5].map(n=>`<span class="pip ${n<=Number(k)?'on':''}"></span>`).join('');
+            const card = document.createElement('div');
+            card.className='level-card';
+            card.onclick=()=>startLevel(Number(k));
+            card.innerHTML =
+                `<div class="level-thumb" style="background:${thumbs[i]}"></div>`+
+                `<div class="num">第 ${k} 关</div>`+
+                `<div class="lname">${lv.name}</div>`+
+                `<div class="diff">${pips}</div>`;
+            grid.appendChild(card);
+        });
+    })();
+</script>
 </body>
 </html>

@@ -1,86 +1,52 @@
-# HideCat 🐱
+# HideCat 🐾 · 猫咪夜逃
 
-A fun browser-based escape game where you control a cat trying to reach the exit while avoiding wild dogs.
+一款扁平卡通矢量风格的浏览器逃生游戏：控制猫咪穿过夜晚的住宅小区，避开野狗、利用路灯安全区，跑向安全出口。
 
-## Game Features
+> 全部美术（角色 / 建筑 / 道具 / 特效）均由代码程序化矢量绘制，风格 100% 统一，无外部图片依赖。
 
-### 🎮 Gameplay
-- **Large Map**: Explore a 3000x3000 pixel world
-- **Click to Move**: Click anywhere on the screen to move the cat
-- **Keyboard Controls**: Use WASD or arrow keys for movement
-- **Sprint**: Hold Shift to run faster (consumes stamina)
+## ▶ 开始游戏
 
-### 🗺️ Levels & Progression
-- **5 levels**, each with its own environment and ground style
-- Difficulty scales up each level: fewer safe lights, more wild dogs
-- Clear a level to advance to the next; beat all 5 to win the game
-- You always start next to a safe light, so no unfair instant deaths
+直接用浏览器打开 **`index.html`** 即可。
 
-### 💡 Safe Zones
-- Stand under street lights to be safe from wild dogs
-- Each level scatters safe light zones across the map (more on early levels)
-- Dogs will stop chasing when you enter a light zone
+## 🎮 玩法
 
-### 🐕 Wild Dogs AI
-- Wild dogs patrol the map (more of them on later levels)
-- Each dog has its own territory
-- **Three AI states**:
-  - Patrol: Slow wandering within territory
-  - Chase: Gradually accelerates when detecting the cat
-  - Return: Goes back to territory when cat escapes
-- **Speed curve**: Dogs start slow and gradually speed up during chase
+- **目标**：从小区一角出发，找到并到达绿色「安全出口」。
+- **危险**：野狗会在视野范围内发现并追击你，被咬会掉血。
+- **安全区**：站在路灯光圈内，野狗不会靠近（也看不见你）。
+- **黑夜**：地图被黑暗笼罩，猫咪自带一圈微光，路灯照亮周围。
+- **难度递进**：5 个关卡，灯光越来越少、野狗越来越多。
+- **彩蛋**：按 `Tab` 可切换控制一只狗，去撕咬驱散野狗与柴犬。
 
-### 🎯 Objective
-- Find the green glowing exit to escape
-- Avoid being caught by wild dogs
-- Use safe zones strategically to plan your route
+## 🕹 操作
 
-### 📊 UI Features
-- Health bar display
-- Distance to exit indicator
-- Safety status indicator
-- Minimap for navigation
-- Danger warnings when dogs approach
+| 操作 | 说明 |
+| --- | --- |
+| 鼠标点击地面 | 移动到该点 |
+| WASD / 方向键 | 直接控制移动 |
+| Shift | 奔跑（消耗体力） |
+| Tab | 切换控制 猫 / 狗 |
+| M | 开关小地图 |
+| ESC | 返回主菜单 |
 
-## How to Play
+## 🎨 美术与系统
 
-1. Open `index.html` in a web browser
-2. Click on the screen to move the cat
-3. Use keyboard for alternative control
-4. Avoid wild dogs by using light safe zones
-5. Find and reach the exit to win
+- **统一扁平矢量风格**：猫、野狗、柴犬重绘为同一套造型语言，带程序化走 / 跑 / 待机 / 受击动画。
+- **小区住宅场景**：路网、人行道、住宅楼（实体障碍 + 亮窗 / 单元门 / 楼顶）、绿化（树 / 灌木 / 绿篱 / 围栏）、矢量路灯。
+- **敌人 UI**：浮动血条、警觉条、状态徽章（`!` 追击 / `?` 好奇 / `♪` 玩耍）、名牌、野狗视野扇形。
+- **商业级界面**：动效主菜单、关卡选择卡片、HUD（血量 / 体力 / 目标 / 小地图）、危险 & 安全提示、结算与关卡进度。
+- **夜晚光照**：离屏遮罩挖洞光照、灯泡暖光、玩家随身光、暗角、相机震动与粒子特效。
 
-## Game Files
+## 📁 文件结构
 
-- `index.html` - Main game page
-- `game.js` - Simple cat movement game
-- `escape-game.html` - Main escape game page
-- `escape-game.js` - Escape game logic with dogs and safe zones
-- `cat-sprite.png` - Cat sprite animation sheet
+```
+index.html        主游戏（商业版入口）
+js/art.js         统一矢量美术系统（调色板 + 角色/建筑/道具绘制）
+js/world.js       小区世界生成、路网、地面渲染、建筑碰撞
+js/entities.js    猫 / 野狗 / 柴犬 / 玩家狗 / 安全灯 / 出口
+js/ui.js          黑暗光照、暗角、敌人浮动 UI、视野扇形、粒子
+js/main.js        主循环、相机、输入、关卡流程、小地图、HUD
+```
 
-## Controls
+旧版本保留作为存档：`escape-game.html`（上一代逃生原型）、`cat-demo.html`（最初的移动演示）。
 
-- **Mouse**: Click to set destination
-- **WASD/Arrow Keys**: Direct movement
-- **Shift**: Sprint (faster movement, uses stamina)
-- **Tab**: Switch between controlling the cat and a dog
-- **M**: Toggle the minimap
-- **ESC**: Return to the level menu
-
-## Strategy Tips
-
-- 🗺️ Check the minimap to plan your route
-- 💡 Move from one safe zone to another
-- 🏃 Save stamina for emergency escapes
-- 👀 Watch dog patrol patterns
-- ⏱️ Dogs accelerate slowly, giving you time to react
-
-## Technical Details
-
-- Built with HTML5 Canvas
-- Pure JavaScript (no frameworks required)
-- Sprite-based animation system
-- Viewport scrolling for large map
-- Optimized collision detection
-
-Enjoy playing HideCat! 🎮🐱
+享受游戏！🐱🌙
