@@ -10,13 +10,19 @@ A fun browser-based escape game where you control a cat trying to reach the exit
 - **Keyboard Controls**: Use WASD or arrow keys for movement
 - **Sprint**: Hold Shift to run faster (consumes stamina)
 
+### 🗺️ Levels & Progression
+- **5 levels**, each with its own environment and ground style
+- Difficulty scales up each level: fewer safe lights, more wild dogs
+- Clear a level to advance to the next; beat all 5 to win the game
+- You always start next to a safe light, so no unfair instant deaths
+
 ### 💡 Safe Zones
 - Stand under street lights to be safe from wild dogs
-- 12 randomly placed safe light zones throughout the map
+- Each level scatters safe light zones across the map (more on early levels)
 - Dogs will stop chasing when you enter a light zone
 
 ### 🐕 Wild Dogs AI
-- **15 wild dogs** patrol the map
+- Wild dogs patrol the map (more of them on later levels)
 - Each dog has its own territory
 - **Three AI states**:
   - Patrol: Slow wandering within territory
@@ -57,6 +63,9 @@ A fun browser-based escape game where you control a cat trying to reach the exit
 - **Mouse**: Click to set destination
 - **WASD/Arrow Keys**: Direct movement
 - **Shift**: Sprint (faster movement, uses stamina)
+- **Tab**: Switch between controlling the cat and a dog
+- **M**: Toggle the minimap
+- **ESC**: Return to the level menu
 
 ## Strategy Tips
 

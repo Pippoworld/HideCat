@@ -183,7 +183,7 @@ class Cat {
         if (keys.ArrowDown || keys.KeyS) dy = 1;
 
         // 奔跑状态
-        this.isRunning = keys.ShiftLeft && this.stamina > 0;
+        this.isRunning = (keys.ShiftLeft || keys.ShiftRight) && this.stamina > 0;
 
         // 设置目标最高速度（正常或奔跑）
         this.currentMaxSpeed = this.isRunning ? this.runSpeed : this.normalSpeed;
@@ -1461,11 +1461,25 @@ class Exit {
     }
 }
 
+// 每个关卡的难度配置（灯光越少、敌人越多越难）
+const LEVEL_CONFIG = {
+    1: { lights: 14, dogs: 8,  shibas: 6,  name: '夜晚都市' },
+    2: { lights: 12, dogs: 11, shibas: 7,  name: '公园漫步' },
+    3: { lights: 10, dogs: 14, shibas: 8,  name: '城市街区' },
+    4: { lights: 9,  dogs: 17, shibas: 9,  name: '混合地带' },
+    5: { lights: 8,  dogs: 20, shibas: 10, name: '废墟遗迹' }
+};
+const MAX_LEVEL = 5;
+
+// 猫咪的出生点
+const CAT_START_X = 200;
+const CAT_START_Y = 200;
+
 // 游戏世界
 class GameWorld {
-    constructor() {
+    constructor(level = 1) {
         this.camera = new Camera();
-        this.cat = new Cat(200, 200);
+        this.cat = new Cat(CAT_START_X, CAT_START_Y);
         this.lights = [];
         this.dogs = [];
         this.shibas = [];  // 柴犬列表
@@ -1481,7 +1495,7 @@ class GameWorld {
         this.playerDog = null; // 当切换到狗模式时创建
 
         // 关卡系统
-        this.currentLevel = 1; // 默认关卡1
+        this.currentLevel = LEVEL_CONFIG[level] ? level : 1; // 当前关卡
         this.levelMenu = document.getElementById('levelMenu');
 
         // 小地图显示状态
@@ -1496,17 +1510,33 @@ class GameWorld {
     }
 
     init() {
-        // 生成灯光
-        for (let i = 0; i < 12; i++) {
+        // 读取当前关卡的难度配置
+        const config = LEVEL_CONFIG[this.currentLevel] || LEVEL_CONFIG[1];
+
+        // 与猫出生点保持的最小安全距离，避免一开局就被咬
+        const SPAWN_CLEARANCE = 450;
+
+        // 先在猫的出生点放一盏灯，保证开局有一个安全区
+        this.lights.push(new SafeLight(CAT_START_X, CAT_START_Y));
+
+        // 生成其余灯光
+        for (let i = 0; i < config.lights - 1; i++) {
             const x = Math.random() * (WORLD_WIDTH - 400) + 200;
             const y = Math.random() * (WORLD_HEIGHT - 400) + 200;
             this.lights.push(new SafeLight(x, y));
         }
 
         // 生成野狗
-        for (let i = 0; i < 15; i++) {
+        for (let i = 0; i < config.dogs; i++) {
             const x = Math.random() * (WORLD_WIDTH - 400) + 200;
             const y = Math.random() * (WORLD_HEIGHT - 400) + 200;
+
+            // 不能离猫出生点太近
+            const distToCat = Math.hypot(x - CAT_START_X, y - CAT_START_Y);
+            if (distToCat < SPAWN_CLEARANCE) {
+                i--;
+                continue;
+            }
 
             // 确保野狗不在灯光范围内生成
             let validPosition = true;
@@ -1525,9 +1555,16 @@ class GameWorld {
         }
 
         // 生成柴犬（比野狗少，更友善）
-        for (let i = 0; i < 8; i++) {
+        for (let i = 0; i < config.shibas; i++) {
             const x = Math.random() * (WORLD_WIDTH - 400) + 200;
             const y = Math.random() * (WORLD_HEIGHT - 400) + 200;
+
+            // 不能离猫出生点太近
+            const distToCat = Math.hypot(x - CAT_START_X, y - CAT_START_Y);
+            if (distToCat < SPAWN_CLEARANCE) {
+                i--;
+                continue;
+            }
 
             // 确保柴犬不在灯光范围内生成
             let validPosition = true;
@@ -2060,9 +2097,6 @@ class GameWorld {
             default:
                 this.drawLightingScheme1();
         }
-
-        // 显示当前方案信息
-        this.showLightingSchemeInfo();
     }
 
     // 方案1：原始方案（当前的实现）
@@ -2501,6 +2535,10 @@ class GameWorld {
         const healthPercent = Math.max(0, (currentEntity.health / currentEntity.maxHealth) * 100);
         document.getElementById('healthFill').style.width = `${healthPercent}%`;
 
+        // 更新体力（体力是猫咪的属性）
+        const staminaPercent = Math.max(0, (this.cat.stamina / this.cat.maxStamina) * 100);
+        document.getElementById('staminaFill').style.width = `${staminaPercent}%`;
+
         // 更新距离和角色提示
         const dx = this.exit.x - currentEntity.x;
         const dy = this.exit.y - currentEntity.y;
@@ -2542,8 +2580,28 @@ class GameWorld {
     win() {
         gameState.running = false;
         gameState.won = true;
-        document.getElementById('gameOverTitle').textContent = '🎉 成功逃脱！';
-        document.getElementById('gameOverMessage').textContent = '你成功带领猫咪逃离了危险区域！';
+
+        const title = document.getElementById('gameOverTitle');
+        const message = document.getElementById('gameOverMessage');
+        const buttons = document.getElementById('gameOverButtons');
+
+        if (this.currentLevel < MAX_LEVEL) {
+            // 还有下一关
+            const next = LEVEL_CONFIG[this.currentLevel + 1];
+            title.textContent = '🎉 关卡完成！';
+            message.textContent = `猫咪成功逃脱了！下一关：${next.name}`;
+            buttons.innerHTML =
+                `<button onclick="nextLevel()">下一关 ▶</button>` +
+                `<button onclick="returnToMenu()">返回菜单</button>`;
+        } else {
+            // 通关
+            title.textContent = '🏆 恭喜通关！';
+            message.textContent = '你带领猫咪闯过了全部五个关卡，成为了真正的逃脱大师！';
+            buttons.innerHTML =
+                `<button onclick="startLevel(1)">再玩一次</button>` +
+                `<button onclick="returnToMenu()">返回菜单</button>`;
+        }
+
         document.getElementById('gameOver').classList.add('show');
     }
 
@@ -2552,6 +2610,9 @@ class GameWorld {
         gameState.won = false;
         document.getElementById('gameOverTitle').textContent = '😿 游戏结束';
         document.getElementById('gameOverMessage').textContent = '猫咪被野狗抓住了...再试一次吧！';
+        document.getElementById('gameOverButtons').innerHTML =
+            `<button onclick="restartGame()">重新开始</button>` +
+            `<button onclick="returnToMenu()">返回菜单</button>`;
         document.getElementById('gameOver').classList.add('show');
     }
 
@@ -2574,15 +2635,6 @@ class GameWorld {
         if (e.code === 'KeyM') {
             e.preventDefault();
             this.toggleMinimap();
-            return;
-        }
-
-        // 数字键1-6切换光照方案
-        if (e.code >= 'Digit1' && e.code <= 'Digit6') {
-            e.preventDefault();
-            const schemeNumber = parseInt(e.code.charAt(5));
-            this.lightingScheme = schemeNumber;
-            console.log(`切换到光照方案 ${schemeNumber}`);
             return;
         }
 
@@ -2647,45 +2699,56 @@ window.addEventListener('keydown', (e) => game.handleKeyDown(e));
 window.addEventListener('keyup', (e) => game.handleKeyUp(e));
 canvas.addEventListener('click', (e) => game.handleClick(e));
 
-// 重新开始游戏
-function restartGame() {
-    gameState.running = true;
-    gameState.won = false;
-    game = new GameWorld();
-    document.getElementById('gameOver').classList.remove('show');
-    gameLoop();
-}
-
-// 游戏循环
+// 游戏循环（用单一 RAF 句柄管理，避免重复启动导致游戏加速）
+let rafId = null;
 function gameLoop() {
-    if (!gameState.running && !gameState.won) return;
-
+    if (!gameState.running) {
+        rafId = null;
+        return;
+    }
     game.update();
     game.draw();
-
-    requestAnimationFrame(gameLoop);
+    rafId = requestAnimationFrame(gameLoop);
 }
 
-// 关卡选择函数
-function startLevel(levelNumber) {
-    // 隐藏菜单
-    const levelMenu = document.getElementById('levelMenu');
-    levelMenu.classList.add('hidden');
+function startGameLoop() {
+    // 取消任何已排队的帧，保证同时只有一个循环在跑
+    if (rafId !== null) {
+        cancelAnimationFrame(rafId);
+        rafId = null;
+    }
+    rafId = requestAnimationFrame(gameLoop);
+}
 
-    // 重置游戏状态
+// 用指定关卡开始一局新游戏
+function launchLevel(levelNumber) {
+    document.getElementById('levelMenu').classList.add('hidden');
+
     gameState.running = true;
     gameState.won = false;
     gameState.paused = false;
 
-    // 创建新的游戏世界并设置关卡
-    game = new GameWorld();
-    game.currentLevel = levelNumber;
+    // 关卡号要在构造时传入，难度配置和地面绘制都依赖它
+    game = new GameWorld(levelNumber);
 
-    // 清除之前的游戏结束界面
     document.getElementById('gameOver').classList.remove('show');
+    startGameLoop();
+}
 
-    // 启动游戏循环
-    gameLoop();
+// 重新开始当前关卡
+function restartGame() {
+    launchLevel(game.currentLevel);
+}
+
+// 进入下一关
+function nextLevel() {
+    const next = Math.min(game.currentLevel + 1, MAX_LEVEL);
+    launchLevel(next);
+}
+
+// 关卡选择函数（菜单中的关卡卡片调用）
+function startLevel(levelNumber) {
+    launchLevel(levelNumber);
 }
 
 // 返回菜单函数
